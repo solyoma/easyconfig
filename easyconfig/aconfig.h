@@ -59,7 +59,7 @@ struct FIELD_BASE
 	bool changed = false;
 	virtual void Store() = 0;	 // - " -
 
-	FIELD_BASE(std::string name, ACONFIG_KIND kind = ackNone, ACONFIG*parent = nullptr) : name(name), kind(kind), parent(parent) {}
+	FIELD_BASE(std::string name, ACONFIG_KIND kind = ackNone, ACONFIG*parent = nullptr) : name(name), kind(kind), parent(parent) { 	}
 };
 
 struct BOOL_FIELD : public FIELD_BASE
@@ -103,7 +103,7 @@ struct TEXT_FIELD : public FIELD_BASE
 	std::string value;
 	std::string defVal;		// if Load() is unsuccesfull use this
 	TEXT_FIELD(std::string aname, std::string aDefVal = std::string(), std::string val = std::string() , ACONFIG* aparent = nullptr) :
-		FIELD_BASE(aname, ackInt, aparent), value(val), defVal(defVal) {}
+		FIELD_BASE(aname, ackText, aparent), defVal(aDefVal), value(val) {}
 	void Store();
 	std::string ToString() const { return value; }
 	std::string DefToString() const { return defVal; }

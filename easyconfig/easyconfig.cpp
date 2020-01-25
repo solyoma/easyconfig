@@ -58,7 +58,7 @@ int main()
 		config.AddBoolField(std::string("bool_field_") + std::to_string(i), false, true);
 		config.AddIntField (std::string("int_field_") + std::to_string(i), 2*i, i);
 		config.AddRealField(std::string("real_field_") + std::to_string(i), 2.718281828 * i, 3.1415926539*i);
-		config.AddTextField(std::string("text_field_") + std::to_string(i), std::string("tfield")+ std::to_string(i), std::string("no-default"));
+		config.AddTextField(std::string("text_field_") + std::to_string(i), std::string("no-default"), std::string("tfield")+ std::to_string(i));
 	}
 	cout << "Dumping into 'dump1.txt'\n";
 	config.DumpFields(ackNone, "dump1.txt");
