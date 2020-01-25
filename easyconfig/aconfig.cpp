@@ -1,4 +1,5 @@
 #include "aconfig.h"
+#include <sstream>
 
 std::string AconfigKindToString(ACONFIG_KIND kind)
 {
@@ -14,10 +15,30 @@ std::string AconfigKindToString(ACONFIG_KIND kind)
 }
 
 
-void BOOL_FIELD::Store() { parent->WriteBool(this); }
-void INT_FIELD::Store() { parent->WriteInt(this); }
-void REAL_FIELD::Store() { parent->WriteReal(this); }
-void TEXT_FIELD::Store() { parent->WriteText(this); }
+void BOOL_FIELD::Store(std::ostream &ofs)
+{
+	if (value != defVal)
+		ofs << name << ",b," << defVal << "," << value << "\n";
+	changed = false;
+}
+void INT_FIELD::Store(std::ostream &ofs)
+{
+	if (value != defVal)
+		ofs << name << ",i," << defVal << "," << value << "\n";
+	changed = false;
+}
+void REAL_FIELD::Store(std::ostream &ofs)
+{
+	if (value != defVal)
+		ofs << name << ",r," << defVal << "," << value << "\n";
+	changed = false;
+}
+void TEXT_FIELD::Store(std::ostream &ofs)
+{
+	if (value != defVal)
+		ofs << name << ",t," << defVal << "," << value << "\n";
+	changed = false;
+}
 
 BOOL_FIELD& BOOL_FIELD::operator=(bool newVal)
 {
@@ -62,6 +83,18 @@ TEXT_FIELD& TEXT_FIELD::operator=(std::string newVal)
 	return *this;
 }
 
+size_t ACONFIG::Size(ACONFIG_KIND kind) const
+{
+	switch (kind)
+	{
+		case ackBool:	return _boolList.size();
+		case ackInt:	return _intList.size();
+		case ackReal:	return _realList.size();
+		case ackText:	return _textList.size();
+		default:		return _fields.size();
+	}
+}
+
 void ACONFIG::AddBoolField(std::string name, bool defVal, bool val)
 {
 	BOOL_FIELD intf(name, defVal, val, this);
@@ -101,24 +134,26 @@ void ACONFIG::Load(std::string fname)	// from file
 	_ifs.open(fname);
 	if (!_ifs.is_open())
 		throw "can't open";
-	std::vector < std::string> sl;
+
 	splitstring s;
 	while (!_ifs.eof())
 	{
 		_ifs >> s;
-		sl = s.split(',', 1);
-		if (sl.size() != 4) // <name>,<type>,<value>,<default>
+		s.split(',', 1);
+		if (s.Size() != 4) // <name>,<type>,<value>,<default>
 			throw "bad string";
-		switch (sl[1][0])
+		switch (s[1][0])
 		{
-		case 'b': AddBoolField(sl[0], stoi(sl[2]), stoi(sl[3])); break;
-		case 'i': AddIntField(sl[0], stoi(sl[2]), stoi(sl[3])); break;
-		case 'r': AddRealField(sl[0], stod(sl[2]), stod(sl[3])); break;
-		case 't': AddTextField(sl[0], sl[2], sl[3]);
+		case 'b': AddBoolField(s[0], stoi(s[2]), stoi(s[3])); break;
+		case 'i': AddIntField(s[0], stoi(s[2]), stoi(s[3])); break;
+		case 'r': AddRealField(s[0], stod(s[2]), stod(s[3])); break;
+		case 't': AddTextField(s[0], s[2], s[3]);
 		default: break;
 		}
 	}
 	_ifs.close();
+
+	_changed = false;
 }
 
 void ACONFIG::Store(std::string fname)
@@ -128,8 +163,9 @@ void ACONFIG::Store(std::string fname)
 		throw "can't open";
 
 	for (auto p : _fields)
-		p.second->Store();
+		p.second->Store(_ofs);
 	_ofs.close();
+	_changed = false;
 }
 // DEBUG
 FIELD_BASE *ACONFIG::operator[](std::string fieldn)
@@ -164,27 +200,9 @@ ACONFIG &ACONFIG::CopyFrom(const ACONFIG &other)
 // writes field into open file in format
 // <name>,<kind (one LC letter)>,<default>,<actual value>
 
-void ACONFIG::WriteBool(BOOL_FIELD *pf)
+void ACONFIG::_Write(FIELD_BASE * pf)
 {
-	_ofs << pf->name << ",b," << pf->defVal << ","<< pf->value << "\n";
-	pf->changed = false;
-}
-
-void ACONFIG::WriteInt(INT_FIELD *pf)
-{
-	_ofs << pf->name << ",i," << pf->defVal << "," << pf->value << "\n";
-	pf->changed = false;
-}
-
-void ACONFIG::WriteReal(REAL_FIELD *pf)
-{
-	_ofs << pf->name << ",r," << pf->defVal << "," << pf->value << "\n";
-	pf->changed = false;
-}
-
-void ACONFIG::WriteText(TEXT_FIELD *pf)
-{
-	_ofs << pf->name << ",t," << pf->defVal << "," << pf->value << "\n";
+	pf->Store(_ofs);
 	pf->changed = false;
 }
 

@@ -39,3 +39,7 @@ Debug/
 Release/
 *.db
 *.pdb
+
+#easyconfig specific
+*.ini
+*.txt
