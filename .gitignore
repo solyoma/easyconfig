@@ -30,3 +30,12 @@
 *.exe
 *.out
 *.app
+
+#Microsoft specific
+GeneratedFiles/
+x64/
+.vs/
+Debug/
+Release/
+*.db
+*.pdb
