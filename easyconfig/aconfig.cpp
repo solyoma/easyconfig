@@ -1,7 +1,7 @@
 #include "aconfig.h"
 #include <sstream>
 
-std::string AconfigKindToString(ACONFIG_KIND kind)
+String AconfigKindToString(ACONFIG_KIND kind)
 {
 	switch (kind)
 	{
@@ -15,25 +15,25 @@ std::string AconfigKindToString(ACONFIG_KIND kind)
 }
 
 
-void BOOL_FIELD::Store(std::ostream &ofs)
+void BOOL_FIELD::Store(Settings &ofs)
 {
 	if (value != defVal)
 		ofs << name << ",b," << defVal << "," << value << "\n";
 	changed = false;
 }
-void INT_FIELD::Store(std::ostream &ofs)
+void INT_FIELD::Store(Settings &ofs)
 {
 	if (value != defVal)
 		ofs << name << ",i," << defVal << "," << value << "\n";
 	changed = false;
 }
-void REAL_FIELD::Store(std::ostream &ofs)
+void REAL_FIELD::Store(Settings &ofs)
 {
 	if (value != defVal)
 		ofs << name << ",r," << defVal << "," << value << "\n";
 	changed = false;
 }
-void TEXT_FIELD::Store(std::ostream &ofs)
+void TEXT_FIELD::Store(Settings &ofs)
 {
 	if (value != defVal)
 		ofs << name << ",t," << defVal << "," << value << "\n";
@@ -72,7 +72,7 @@ REAL_FIELD& REAL_FIELD::operator=(double newVal)
 	return *this;
 }
 //-------------------------------------
-TEXT_FIELD& TEXT_FIELD::operator=(std::string newVal)
+TEXT_FIELD& TEXT_FIELD::operator=(String newVal)
 {
 	if (changed = (newVal != value))
 	{
@@ -83,7 +83,7 @@ TEXT_FIELD& TEXT_FIELD::operator=(std::string newVal)
 	return *this;
 }
 
-size_t ACONFIG::Size(ACONFIG_KIND kind) const
+size_t COMPOUND_FIELD::Size(ACONFIG_KIND kind) const
 {
 	switch (kind)
 	{
@@ -95,7 +95,7 @@ size_t ACONFIG::Size(ACONFIG_KIND kind) const
 	}
 }
 
-void ACONFIG::AddBoolField(std::string name, bool defVal, bool val)
+void COMPOUND_FIELD::AddBoolField(String name, bool defVal, bool val)
 {
 	BOOL_FIELD intf(name, defVal, val, this);
 	_boolList.push_back(intf);
@@ -103,7 +103,7 @@ void ACONFIG::AddBoolField(std::string name, bool defVal, bool val)
 		throw "type mismatch";
 	_fields[name] = &_boolList.back();
 }
-void ACONFIG::AddIntField(std::string name, int defVal, int val)
+void COMPOUND_FIELD::AddIntField(String name, int defVal, int val)
 {
 	INT_FIELD intf(name, defVal, val, this);
 	_intList.push_back(intf);
@@ -111,7 +111,7 @@ void ACONFIG::AddIntField(std::string name, int defVal, int val)
 		throw "type mismatch";
 	_fields[name] = &_intList.back();
 }
-void ACONFIG::AddRealField(std::string name, double defVal, double val)
+void COMPOUND_FIELD::AddRealField(String name, double defVal, double val)
 {
 	REAL_FIELD intf(name, defVal, val, this);
 	_realList.push_back(intf);
@@ -119,7 +119,7 @@ void ACONFIG::AddRealField(std::string name, double defVal, double val)
 		throw "type mismatch";
 	_fields[name] = &_realList.back();
 }
-void ACONFIG::AddTextField(std::string name, std::string defVal, std::string val)
+void COMPOUND_FIELD::AddTextField(String name, String defVal, String val)
 {
 	TEXT_FIELD textf(name, defVal, val, this);
 	size_t n = _textList.size();
@@ -129,7 +129,51 @@ void ACONFIG::AddTextField(std::string name, std::string defVal, std::string val
 	_fields[name] = &_textList.back();
 }
 
-void ACONFIG::Load(std::string fname)	// from file
+FIELD_BASE *COMPOUND_FIELD::operator[](String fieldn)
+{
+
+	if (_fields.count(fieldn))
+		return _fields[fieldn];
+	return nullptr;
+}
+
+void COMPOUND_FIELD::_CopyLists(const COMPOUND_FIELD &other)
+{
+	changed = other.changed;
+	_intList = other._intList;
+	_boolList = other._boolList;
+	_realList = other._realList;
+	_textList = other._textList;
+	_compList = other._compList;
+
+	_fields.clear();
+	// set up new _fields
+	for (auto a : _boolList)
+		_fields[a.name] = &a;
+	for (auto a : _intList)
+		_fields[a.name] = &a;
+	for (auto a : _realList)
+		_fields[a.name] = &a;
+	for (auto a : _textList)
+		_fields[a.name] = &a;
+	for (auto a : _compList)
+		_fields[a.name] = &a;
+}
+
+COMPOUND_FIELD &COMPOUND_FIELD::operator=(const COMPOUND_FIELD &other)
+{
+	TEXT_FIELD::operator=(other);
+	_CopyLists(other);
+
+	return *this;
+}
+
+
+	//if (_ifs.is_open())
+	//	_ifs.close();
+	//if (_ofs.is_open())
+	//	_ofs.close();
+void ACONFIG::Load(String fname)	// from file
 {
 	_ifs.open(fname);
 	if (!_ifs.is_open())
@@ -153,10 +197,10 @@ void ACONFIG::Load(std::string fname)	// from file
 	}
 	_ifs.close();
 
-	_changed = false;
+	changed = false;
 }
 
-void ACONFIG::Store(std::string fname)
+void ACONFIG::Store(String fname)
 {
 	_ofs.open(fname.c_str());
 	if (!_ofs.is_open())
@@ -164,38 +208,13 @@ void ACONFIG::Store(std::string fname)
 
 	for (auto p : _fields)
 		p.second->Store(_ofs);
+
 	_ofs.close();
-	_changed = false;
+
+	changed = false;
 }
+
 // DEBUG
-FIELD_BASE *ACONFIG::operator[](std::string fieldn)
-{
-
-	if (_fields.count(fieldn))
-		return _fields[fieldn];
-	return nullptr;
-}
-ACONFIG &ACONFIG::CopyFrom(const ACONFIG &other)
-{
-	if (_ifs.is_open())
-		_ifs.close();
-	if (_ofs.is_open())
-		_ofs.close();
-	_changed = other._changed;
-	_intList = other._intList;
-	_boolList = other._boolList;
-	_realList = other._realList;
-	_textList = other._textList;
-
-	_fields.clear();
-	for (auto a : _intList)
-		_fields[a.name] = &a;
-	for (auto a : _textList)
-		_fields[a.name] = &a;
-
-	return *this;
-}
-
 //--------------------------------------------------------------
 // writes field into open file in format
 // <name>,<kind (one LC letter)>,<default>,<actual value>
@@ -206,7 +225,7 @@ void ACONFIG::_Write(FIELD_BASE * pf)
 	pf->changed = false;
 }
 
-void ACONFIG::DumpFields(ACONFIG_KIND kind, std::string file)
+void ACONFIG::DumpFields(ACONFIG_KIND kind, String file)
 {
 	std::ofstream ofs;
 	auto coutbuf = std::cout.rdbuf();
@@ -248,14 +267,14 @@ void ACONFIG::DumpFields(ACONFIG_KIND kind, std::string file)
 		std::cout.rdbuf(coutbuf);
 }
 
-//void ACONFIG::Load(std::string fname)
+//void ACONFIG::Load(String fname)
 //{
 //		// load each field from file as text and store it 
 //		// file contains lines for each field
 //		//	<name>,<type>,<value>,<defval>
 //
 //}
-//void ACONFIG::Store(std::string fname)
+//void ACONFIG::Store(String fname)
 //{
 //
 //}
