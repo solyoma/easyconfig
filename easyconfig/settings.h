@@ -12,11 +12,30 @@
 using String = std::string;
 using StringList = std::list<String>;
 using StringMap = std::map<String, String>;
+
+// pairs: ( <full name>, <value> )	<= <full name> = <value>
+// Example 
+//      pair								in ini file: 				using Settings(s)
+
+//	(Fruit, apple)							Fruit=apple					s.setValue("fruit","apple");
+
+//  (fruit\apple,red)						[fruit]						s.beginGroup("fruit"); s.setValue("apple","red");; s.endGroup();
+//											apple=red
+
+// (fruit\apple\color, blue)				[fruit]						s.beginGroup("fruit"); 
+//											apple\color=blue			  s.beginGroup(apple);
+//																			s.setValue("color","blue"); 
+//																		  s.endGroup(); 
+//																		s.endGroup();
+//                                                             OR:
+//																		s.setValue("fruit\\apple\\color","blue");
+
+
 using ValuePair = std::pair<String, String>;
 
 class VelueVector 
 {
-	std::vector<ValuePair> _values;
+	std::vector<ValuePair> _values; 
 	int _nVpIndex;	// in _values;
 
 	int _Find(String name)	//0: not found, other *** index+1 *** of element
