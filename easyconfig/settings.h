@@ -6,10 +6,29 @@
 #include <iostream>
 #include <fstream>
 
+#include "trim.h"
 //******************************************
 // Settings class: stores/retrieves data in/from files
 
-using String = std::string;
+class String : public std::string
+{
+public:
+	String	left(size_t n) const { return 	static_cast< String>(substr(0, n)); }
+	String	mid(size_t from, size_t n=0xffff) const  { return 	static_cast<String>(substr(from, n)); }
+	String	right(size_t n) const { return static_cast<String>(substr(s.length() - n)); }
+
+	String	isEmpty()	const { return empty(); }
+	String  lTrim() const { return ltrim_copy(*this); }
+	String  rTrim() const { return rtrim_copy(*this); }
+	String  trim() const { return ltrim_copy(rTrim() ); }
+
+	int indexOf(const String &str, int from = 0) const
+	{
+		return (int)
+	}
+};
+
+
 using StringList = std::list<String>;
 using StringMap = std::map<String, String>;
 
@@ -37,9 +56,23 @@ class VelueVector
 {
 	std::vector<ValuePair> _values; 
 	int _nVpIndex;	// in _values;
+	String _group;	// actual group
 
-	int _Find(String name)	//0: not found, other *** index+1 *** of element
+	bool _SetRootGroup(char *buf)
 	{
+		if (buf[0] == '[')	// root section header
+		{
+			char *p = strchr(buf, ']');
+			if (!p)
+				throw "bad section head";
+			_group = String(buf + 1).left((p - buf) - 1);
+			return true;
+		}
+		return false;
+	}
+	
+	int _Find(String name)	// 0: not found, other *** index+1 *** of element
+	{						// name: full path name
 		_nVpIndex = 0;
 		for (auto p : _values)
 			if (p.first == name)
@@ -48,22 +81,109 @@ class VelueVector
 				++_nVpIndex;
 		return _nVpIndex;
 	}
+	size_t _AddPair(char *buf) // format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
+	{
+		char *p = strchr(buf, '#');
+		if (p)
+			*p = 0;
+		if ( (p = strchr(buf, '=')) == 0)
+			throw "bad line";
+
+		*p++ = 0;
+		String sKey = String(Trim(buf));
+		if (!_group.isEmpty())
+			sKey = _group + "\\" + sKey;
+		_values.push_back( std::make_pair( sKey, String(Trim(p))) );
+
+		return _values.size();
+	}
+	size_t _AddPair(String s) // format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
+	{
+		char buf[1024];
+		int len = s.length();
+		if (len > 1023)
+			len = 1023;
+		strncpy(buf, s.c_str(), len);
+		buf[len] = 0;
+		return _AddPair(buf);
+	}
+
 public:
+	bool Contains(String name)
+	{
+		return _Find(name);
+	}
+
 	String &operator[](String name)
 	{
-		static String _dummy;
 		int i = _Find(name);
 		if (i)	// found
-			return &_values[--i].second;
-		return _dummy;
+			return _values[--i].second;
+
+		_values.push_back(std::make_pair(name, String())); 
+		return _values[_values.size() - 1].second;
+		
+	}
+	String GetSection(String session_name) // all sub-strings for name
+	{
+		String s;
+		size_t slen = session_name.length();
+		for (auto p : _values)
+			if (p.first.substr(0, slen) == session_name)
+			{
+				while (p.first.substr(0, slen) == session_name)
+					s += p.second + "\n";
+				return s;
+			}
+		return s;
+	}
+
+	int Read(String name)
+	{
+		std::ifstream ifs(name);
+		char buf[1024];
+
+		if (!ifs.bad())
+		{
+			while (ifs.getline(buf, 1024, '\n'))
+			{
+				if(!_SetRootGroup(buf))
+					_AddPair(buf);
+			}
+			return (int)_values.size();
+		}
+		return 0;
+	}
+	void Write(String name)
+	{
+		std::ofstream ofs(name);
+		if (ofs.bad())
+			throw "can't write";
+		_group.clear();
+		String s;
+		size_t len = 0;
+
+		for (auto v : _values)
+		{
+
+			auto n = v.first.find_first_of('\\');
+			if (n != String::npos)
+			{
+				s = v.first.left(n);		// first group ?
+				if (_group != s)
+				{
+					_group = s;
+					len = s.length();
+					ofs << "[" << s << "]\n";
+				}
+				ofs << s.mid(len) << "=" << v.second << "\n";
+			}
+			else
+				ofs << v.first << v.second << "\n";
+		}
 	}
 };
 
-class SettingsGroup 
-{
-	String sGroupName;
-
-};
 /*========================================================
  * Settings class
  * REMARKS: - settings are stored in ini format files, BUT
@@ -74,7 +194,7 @@ class SettingsGroup
 class Settings
 {
 	String	_sIniName,		// name of input/output files
-		_sOName;		// special name for e.g. organization
+			_sOName;		// special name for e.g. organization
 
 	bool _changed = false;
 	std::vector<ValuePair> _values;	   // < <full path name>, <value> >

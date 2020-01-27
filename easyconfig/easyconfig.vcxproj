@@ -157,6 +157,7 @@
   <ItemGroup>
     <ClInclude Include="aconfig.h" />
     <ClInclude Include="settings.h" />
+    <ClInclude Include="trim.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
