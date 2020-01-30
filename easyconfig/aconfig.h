@@ -1,4 +1,5 @@
 #pragma once
+#include "settings.h"
 
 //******************************************
 // splittable string http://www.cplusplus.com/articles/1UqpX9L8/
@@ -71,7 +72,7 @@ struct FIELD_BASE
 	}
 
 	bool changed = false;
-	virtual void Store(std::ostream &_ofs) = 0;	 // - " -
+	virtual void Store(Settings &s) = 0;	 // - " -
 	virtual void Retrieve(Settings &ofs) = 0;
 	virtual String ToString() const = 0;
 	virtual	String DefToString() const = 0;
@@ -87,7 +88,7 @@ struct BOOL_FIELD : public FIELD_BASE
 	BOOL_FIELD(String aname, bool aDefVal =false, bool val=false, COMPOUND_FIELD *aparent = nullptr) :
 		FIELD_BASE(aname, ackBool, aparent), value(val), defVal(aDefVal) {}
 	BOOL_FIELD(const BOOL_FIELD &bf) : BOOL_FIELD(bf.name, bf.defVal, bf.value, bf.parent) {}
-	void Store(std::ostream &_ofs);
+	void Store(Settings &s);
 	virtual void Retrieve(Settings &ofs);
 	String ToString() const { return value ? "TRUE" : "FALSE"; }
 	String DefToString() const { return defVal ? "TRUE" : "FALSE"; }
@@ -121,7 +122,7 @@ struct INT_FIELD : public FIELD_BASE
 		return prefix ? "0x" + s : s;
 	}
 
-	void Store(std::ostream &_ofs);
+	void Store(Settings &s);
 	virtual void Retrieve(Settings &ofs);
 	String ToString() const { return std::to_string(value); }
 	String DefToString() const { return std::to_string(defVal); }
@@ -138,7 +139,7 @@ struct REAL_FIELD : public FIELD_BASE
 		FIELD_BASE(aname, ackReal, aparent), value(val), defVal(defVal) {}
 	REAL_FIELD(const REAL_FIELD &bf) : REAL_FIELD(bf.name, bf.defVal, bf.value, bf.parent) {}
 
-	void Store(std::ostream &_ofs);
+	void Store(Settings &s);
 	virtual void Retrieve(Settings &ofs);
 
 	String ToString() const { return std::to_string(value); }
@@ -156,7 +157,7 @@ struct TEXT_FIELD : public FIELD_BASE
 		FIELD_BASE(aname, ackText, aparent), defVal(aDefVal), value(val) {}
 	TEXT_FIELD(const TEXT_FIELD &bf) : TEXT_FIELD(bf.name, bf.defVal, bf.value, bf.parent) {}
 
-	void Store(std::ostream &_ofs);
+	void Store(Settings &s);
 	virtual void Retrieve(Settings &ofs);
 
 	String ToString() const { return value; }
@@ -191,6 +192,9 @@ public:
 	void AddIntField(String name, int defVal = 0, int val = 0);
 	void AddRealField(String name, double defVal = 0.0, double val = 0.0);
 	void AddTextField(String name, String defVal = String(), String val = String());
+
+	void Store(Settings &s);
+	virtual void Retrieve(Settings &ofs);
 };
 
 class ACONFIG : public COMPOUND_FIELD
@@ -198,14 +202,11 @@ class ACONFIG : public COMPOUND_FIELD
 	std::ifstream _ifs;
 	std::ofstream _ofs;
 
-	void _Write(FIELD_BASE *pf);
 public:
-	ACONFIG() : COMPOUND_FIELD("root") {}
+	ACONFIG() : COMPOUND_FIELD("\\") {}
 
-	void Load(String fname);	// from file
+	void Load(String fname);	// from ini file
 	void Store(String fname);
 		// DEBUG
 	void DumpFields(ACONFIG_KIND kind = ackNone, String file=String());	// print all
-		// operators
-	ACONFIG &CopyFrom(const ACONFIG &other);
 };

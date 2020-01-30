@@ -10,6 +10,7 @@
 //******************************************
 // Settings class: stores/retrieves data in/from files
 
+#if 0
 class String : public std::string
 {
 public:
@@ -27,8 +28,22 @@ public:
 		return (int)
 	}
 };
+#else
+	#ifdef QSTRING_H
+		using String = QString;
+		const NPOS = -1;
+	#else
+		using String = std::string;
 
-
+		#define left(n)	substr(0,n)
+		#define  right(n,s) substr(s.length() - n)
+		#define  mid	substr
+		#define indexOf	find_first_of
+		#define lastIndexOf	find_last_of
+		#define isEmpty()	empty()
+		#define NPOS	std::string::npos
+	#endif
+#endif
 using StringList = std::list<String>;
 using StringMap = std::map<String, String>;
 
@@ -51,28 +66,41 @@ using StringMap = std::map<String, String>;
 
 
 using ValuePair = std::pair<String, String>;
-
-class VelueVector 
+class ValueItem 
 {
+	String _val;
+public:
+	ValueItem() {}
+	ValueItem(String &val) :_val(val) {}
+	String toString() const { return  _val; }
+	int toInt() const { return std::stoi (_val); }
+	int toBool() const { return std::stoi(_val); }
+	double toDouble() { return std::stod (_val); }
+};
+
+class ValueVector 
+{
+protected:
 	std::vector<ValuePair> _values; 
+	bool _changed = false;
 	int _nVpIndex;	// in _values;
 	String _group;	// actual group
 
-	bool _SetRootGroup(char *buf)
+	bool _SetGroupRootFrom(char *buf)
 	{
 		if (buf[0] == '[')	// root section header
 		{
 			char *p = strchr(buf, ']');
 			if (!p)
 				throw "bad section head";
-			_group = String(buf + 1).left((p - buf) - 1);
+			_group = String(buf + 1).left((p - buf) - 1) + "\\";
 			return true;
 		}
 		return false;
 	}
 	
 	int _Find(String name)	// 0: not found, other *** index+1 *** of element
-	{						// name: full path name
+	{						// name: full path name, e.g. s\b\c
 		_nVpIndex = 0;
 		for (auto p : _values)
 			if (p.first == name)
@@ -81,6 +109,7 @@ class VelueVector
 				++_nVpIndex;
 		return _nVpIndex;
 	}
+
 	size_t _AddPair(char *buf) // format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
 	{
 		char *p = strchr(buf, '#');
@@ -90,13 +119,27 @@ class VelueVector
 			throw "bad line";
 
 		*p++ = 0;
-		String sKey = String(Trim(buf));
+		String	sKey = String(Trim(buf)),
+				sValue = String(Trim(p));
+
 		if (!_group.isEmpty())
-			sKey = _group + "\\" + sKey;
-		_values.push_back( std::make_pair( sKey, String(Trim(p))) );
+			sKey = _group + sKey;
+
+		int i = _Find(sKey);
+		if (i)
+		{
+			_values.push_back(std::make_pair(sKey, sValue) );
+			_changed = true;
+		}
+		else
+		{
+			_values[i - 1].second = sValue;
+			_changed = true;
+		}
 
 		return _values.size();
 	}
+
 	size_t _AddPair(String s) // format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
 	{
 		char buf[1024];
@@ -109,12 +152,12 @@ class VelueVector
 	}
 
 public:
-	bool Contains(String name)
+	bool Contains(String name)		// name full path from root, e.g. a\b\c
 	{
 		return _Find(name);
 	}
 
-	String &operator[](String name)
+	String &operator[](String name)	   // if name is not present adds new pair with empty value
 	{
 		int i = _Find(name);
 		if (i)	// found
@@ -138,6 +181,23 @@ public:
 		return s;
 	}
 
+	void beginGroup(String s)
+	{
+		_group += s + "\\";
+	}
+
+	void endGroup()
+	{
+		if (_group.isEmpty())
+			return;
+		_group = _group.left(_group.length() - 1);	// cut ending '\'
+		size_t ind = _group.lastIndexOf('\\');		// get start of last group
+		if (ind != NPOS)
+			_group = _group.left(ind + 1);			// delete last group, leaving the '\'
+		else
+			_group.clear();							// no more '\' at end: last group
+	}
+
 	int Read(String name)
 	{
 		std::ifstream ifs(name);
@@ -145,15 +205,18 @@ public:
 
 		if (!ifs.bad())
 		{
+			_values.clear();
+
 			while (ifs.getline(buf, 1024, '\n'))
 			{
-				if(!_SetRootGroup(buf))
-					_AddPair(buf);
+				if(!_SetGroupRootFrom(buf))		// if [group name] => set _groups
+					_AddPair(buf);				// else add lines to actual group
 			}
 			return (int)_values.size();
 		}
 		return 0;
 	}
+
 	void Write(String name)
 	{
 		std::ofstream ofs(name);
@@ -165,9 +228,8 @@ public:
 
 		for (auto v : _values)
 		{
-
-			auto n = v.first.find_first_of('\\');
-			if (n != String::npos)
+			auto n = v.first.indexOf('\\');
+			if (n != NPOS)
 			{
 				s = v.first.left(n);		// first group ?
 				if (_group != s)
@@ -182,6 +244,45 @@ public:
 				ofs << v.first << v.second << "\n";
 		}
 	}
+
+	void setValue(String name, bool value)	// name relative to _group
+	{
+		setValue(name, std::to_string(value));
+	}
+	void setValue(String name, int value)	// name relative to _group
+	{
+		setValue(name, std::to_string(value));
+	}
+	void setValue(String name, double value)	// name relative to _group
+	{
+		setValue(name, std::to_string(value));
+	}
+	void setValue(String name, String value)	// name relative to _group
+	{
+		if(_group.length())
+			name = name.mid(_group.length());
+		_AddPair(name + "=" + value);
+	}
+
+	ValueItem value(String name, String defVal)
+	{
+		name = _group + name;
+		if (!_Find(name))
+			return ValueItem(defVal);
+		return ValueItem(operator[](name));
+	}
+	ValueItem value(String name, bool defVal)
+	{
+		return value(name, std::to_string(defVal));
+	}
+	ValueItem value(String name, int defVal)
+	{
+		return value(name, std::to_string(defVal));
+	}
+	ValueItem value(String name, double defVal)
+	{
+		return value(name, std::to_string(defVal));
+	}
 };
 
 /*========================================================
@@ -191,58 +292,23 @@ public:
  *			- top level group in []
  *			- other groups start with a backslash
  *-------------------------------------------------------*/
-class Settings
+class Settings	: public ValueVector
 {
 	String	_sIniName,		// name of input/output files
 			_sOName;		// special name for e.g. organization
 
-	bool _changed = false;
-	std::vector<ValuePair> _values;	   // < <full path name>, <value> >
-	void _Read()
-	{
-		std::ifstream ifs(_sIniName);
-		if (!ifs.is_open())
-			return;
-
-
-	}
 public:
-	struct Value
-	{
-		String name, defVal;		// set at  each query
-		ValuePair vp;;			// (name, value) pairs set up on constucting Settings from file
-
-		String toString() const { return  name.empty() ? defVal : name; }
-		int toInt() const { return std::stoi(toString()); }
-		int toBool() const { return std::stoi(toString()); }
-		double toDouble() { return std::stod(toString()); }
-
-	};
-
-
 	Settings() {};
-	Settings(String iniName) :_sIniName(iniName) { _Read(); }
-	Settings(String oName, String iniName) : _sIniName(iniName), _sOName(oName) { _Read(); }
+	Settings(String iniName) { if( ! _sIniName.isEmpty() && _sIniName != iniName) Read(iniName); }
+	Settings(String oName, String iniName) : _sIniName(iniName), _sOName(oName) { Read(iniName); }
 	~Settings()
 	{
 
 		if (!_changed)
 			return;
-
-		std::ofstream ofs(_sIniName);
-		if (!ofs.is_open())
-			return;
-
+		Write(_sIniName);
 	}
 
-	void SetNames(String oName, String iniName) { _sName = iniName; _sOName = oName; _Read(); }
-
-	// Getters
-	Value& value(String name, String defVal)
-	{
-		_value.name = name; _value.defVal = defVal;
-		return _value;
-	}
+	void SetNames(String oName, String iniName) { _sIniName = iniName; _sOName = oName; Read(iniName); }
 };
-
 

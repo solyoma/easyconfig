@@ -15,28 +15,134 @@ String AconfigKindToString(ACONFIG_KIND kind)
 }
 
 
-void BOOL_FIELD::Store(Settings &ofs)
+void BOOL_FIELD::Store(Settings &s)
 {
 	if (value != defVal)
-		ofs << name << ",b," << defVal << "," << value << "\n";
+	{
+		s.beginGroup(name);
+			s.setValue("kind", "b");
+			s.setValue("value", value);
+			s.setValue("default", defVal);
+		s.endGroup();
+	}
 	changed = false;
 }
-void INT_FIELD::Store(Settings &ofs)
+
+void BOOL_FIELD::Retrieve(Settings & s)
 {
-	if (value != defVal)
-		ofs << name << ",i," << defVal << "," << value << "\n";
+	s.beginGroup(name);
+		if (s.value("kind","x").toString() != "b")
+			throw "bool-field type mismatch";
+		defVal = s.value("default", false).toBool();
+		value = s.value("value", defVal).toBool();
+	s.endGroup();
+
 	changed = false;
 }
-void REAL_FIELD::Store(Settings &ofs)
+
+
+void INT_FIELD::Store(Settings &s)
 {
 	if (value != defVal)
-		ofs << name << ",r," << defVal << "," << value << "\n";
+	{
+		s.beginGroup(name);
+			s.setValue("kind", "i");
+			s.setValue("value", value);
+			s.setValue("default", defVal);
+		s.endGroup();
+	}
 	changed = false;
 }
-void TEXT_FIELD::Store(Settings &ofs)
+
+void INT_FIELD::Retrieve(Settings & s)
+{
+	s.beginGroup(name);
+	if (s.value("kind", "x").toString() != "i")
+		throw "int-field type mismatch";
+	defVal = s.value("default", 0).toInt();
+	value = s.value("value", defVal).toInt();
+	s.endGroup();
+
+	changed = false;
+}
+
+void REAL_FIELD::Store(Settings &s)
 {
 	if (value != defVal)
-		ofs << name << ",t," << defVal << "," << value << "\n";
+	{
+		s.beginGroup(name);
+			s.setValue("kind", "r");
+			s.setValue("value", value);
+			s.setValue("default:", defVal);
+		s.endGroup();
+	}
+	changed = false;
+}
+
+void REAL_FIELD::Retrieve(Settings & s)
+{
+	s.beginGroup(name);
+	if (s.value("kind", "x").toString() != "r")
+		throw "real-field type mismatch";
+	defVal = s.value("default", 0.0).toDouble();
+	value = s.value("value", defVal).toDouble();
+	s.endGroup();
+
+	changed = false;
+}
+
+void TEXT_FIELD::Store(Settings &s)
+{
+	if (value != defVal)
+	{
+		s.beginGroup(name);
+			s.setValue("kind", "t");
+			s.setValue("value", value);
+			s.setValue("default:", defVal);
+		s.endGroup();
+	}
+	changed = false;
+}
+
+void TEXT_FIELD::Retrieve(Settings & s)
+{
+	s.beginGroup(name);
+		if (s.value("kind", "x").toString() != "t")
+			throw "text-field type mismatch";
+		defVal = s.value("default", false).toString();
+		value = s.value("value", defVal).toString();
+	s.endGroup();
+
+	changed = false;
+}
+
+void COMPOUND_FIELD::Store(Settings &s)
+{
+	BOOL_FIELD *pb;
+
+	s.beginGroup(name);
+		s.setValue("kind", "c");
+		s.setValue("value", value);
+		s.setValue("default:", defVal);
+	for (auto pf : _fields)
+	{
+		if (pf.second->kind != ackNone)
+			pf.second->Store(s);
+	}
+	s.endGroup();
+
+	changed = false;
+}
+
+void COMPOUND_FIELD::Retrieve(Settings & s)
+{
+	s.beginGroup(name);
+		if (s.value("kind", "x").toString() != "b")
+			throw "compound-field type mismatch";
+		defVal = s.value("default", false).toString();
+		value = s.value("value", defVal).toString();
+	s.endGroup();
+
 	changed = false;
 }
 
@@ -168,48 +274,16 @@ COMPOUND_FIELD &COMPOUND_FIELD::operator=(const COMPOUND_FIELD &other)
 	return *this;
 }
 
-
-	//if (_ifs.is_open())
-	//	_ifs.close();
-	//if (_ofs.is_open())
-	//	_ofs.close();
-void ACONFIG::Load(String fname)	// from file
+void ACONFIG::Load(String fname)	// from ini file
 {
-	_ifs.open(fname);
-	if (!_ifs.is_open())
-		throw "can't open";
-
-	splitstring s;
-	while (!_ifs.eof())
-	{
-		_ifs >> s;
-		s.split(',', 1);
-		if (s.Size() != 4) // <name>,<type>,<value>,<default>
-			throw "bad string";
-		switch (s[1][0])
-		{
-		case 'b': AddBoolField(s[0], stoi(s[2]), stoi(s[3])); break;
-		case 'i': AddIntField(s[0], stoi(s[2]), stoi(s[3])); break;
-		case 'r': AddRealField(s[0], stod(s[2]), stod(s[3])); break;
-		case 't': AddTextField(s[0], s[2], s[3]);
-		default: break;
-		}
-	}
-	_ifs.close();
+	Settings s(fname);
 
 	changed = false;
 }
 
 void ACONFIG::Store(String fname)
 {
-	_ofs.open(fname.c_str());
-	if (!_ofs.is_open())
-		throw "can't open";
-
-	for (auto p : _fields)
-		p.second->Store(_ofs);
-
-	_ofs.close();
+	Settings s(fname);
 
 	changed = false;
 }
@@ -218,12 +292,6 @@ void ACONFIG::Store(String fname)
 //--------------------------------------------------------------
 // writes field into open file in format
 // <name>,<kind (one LC letter)>,<default>,<actual value>
-
-void ACONFIG::_Write(FIELD_BASE * pf)
-{
-	pf->Store(_ofs);
-	pf->changed = false;
-}
 
 void ACONFIG::DumpFields(ACONFIG_KIND kind, String file)
 {
