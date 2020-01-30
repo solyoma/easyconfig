@@ -7,21 +7,21 @@
 #include <locale>
 
 // trim for character arrays
-char *LTrim(char *pb)
+static inline char *LTrim(char *pb)
 {
 	while (*pb && std::isspace(*pb)) ++pb;
 	return pb;
 }
-char *RTrim(char *buf)
+static inline char *RTrim(char *buf)
 {
-	char *p = buf + strlen(buf) -1;
-	while(p != buf && std::isspace(*pb)) 
+	char *pb = buf + strlen(buf) -1;
+	while(pb != buf && std::isspace(*pb)) 
 		--pb;
 	*++pb = 0;
 	return buf;
 }
 
-char *Trim(char *buf)
+static inline char *Trim(char *buf)
 {
 	return RTrim(LTrim(buf));
 }

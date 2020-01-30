@@ -143,7 +143,7 @@ protected:
 	size_t _AddPair(String s) // format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
 	{
 		char buf[1024];
-		int len = s.length();
+		size_t len = s.length();
 		if (len > 1023)
 			len = 1023;
 		strncpy(buf, s.c_str(), len);
@@ -301,6 +301,7 @@ public:
 	Settings() {};
 	Settings(String iniName) { if( ! _sIniName.isEmpty() && _sIniName != iniName) Read(iniName); }
 	Settings(String oName, String iniName) : _sIniName(iniName), _sOName(oName) { Read(iniName); }
+	void Store() { Write(_sIniName); }
 	~Settings()
 	{
 

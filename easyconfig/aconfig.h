@@ -199,9 +199,7 @@ public:
 
 class ACONFIG : public COMPOUND_FIELD
 {
-	std::ifstream _ifs;
-	std::ofstream _ofs;
-
+	void _Store(Settings s, FIELD_BASE *pf);
 public:
 	ACONFIG() : COMPOUND_FIELD("\\") {}
 
@@ -209,4 +207,5 @@ public:
 	void Store(String fname);
 		// DEBUG
 	void DumpFields(ACONFIG_KIND kind = ackNone, String file=String());	// print all
+	ACONFIG &operator=(const ACONFIG &other) { COMPOUND_FIELD::operator=(other);  return *this;  }
 };

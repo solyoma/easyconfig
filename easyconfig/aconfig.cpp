@@ -118,8 +118,6 @@ void TEXT_FIELD::Retrieve(Settings & s)
 
 void COMPOUND_FIELD::Store(Settings &s)
 {
-	BOOL_FIELD *pb;
-
 	s.beginGroup(name);
 		s.setValue("kind", "c");
 		s.setValue("value", value);
@@ -281,9 +279,44 @@ void ACONFIG::Load(String fname)	// from ini file
 	changed = false;
 }
 
+void ACONFIG::_Store(Settings s, FIELD_BASE *pf)
+{
+	s.beginGroup(pf->name);
+		s.setValue("kind", pf->kind);
+		switch (pf->kind)		// no variant type on std
+		{
+			case ackBool: s.setValue("value", static_cast<BOOL_FIELD*>(pf)->value);
+						s.setValue("default", static_cast<BOOL_FIELD*>(pf)->defVal);
+						break;
+			case ackInt:  s.setValue("value", static_cast<INT_FIELD*>(pf)->value);
+						s.setValue("default", static_cast<INT_FIELD*>(pf)->defVal);
+						break;
+			case ackReal: s.setValue("value", static_cast<REAL_FIELD*>(pf)->value);
+						s.setValue("default", static_cast<REAL_FIELD*>(pf)->defVal);
+						break;
+			case ackText: s.setValue("value", static_cast<TEXT_FIELD*>(pf)->value);
+						s.setValue("default", static_cast<TEXT_FIELD*>(pf)->defVal);
+						break;
+			case ackComp: s.setValue("value", static_cast<COMPOUND_FIELD*>(pf)->value);
+						s.setValue("default", static_cast<COMPOUND_FIELD*>(pf)->defVal);
+						for (auto pfs : static_cast<ACONFIG*>(pf)->_fields)
+							_Store(s, pfs.second);
+						break;
+			default: break;
+		}
+	s.endGroup();
+}
+
 void ACONFIG::Store(String fname)
 {
 	Settings s(fname);
+
+	for (auto pfs : _fields)
+	{
+		auto pf = pfs.second;
+
+
+	}
 
 	changed = false;
 }

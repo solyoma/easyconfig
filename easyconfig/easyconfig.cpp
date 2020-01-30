@@ -60,10 +60,13 @@ int main()
 		config.AddRealField(std::string("real_field_") + std::to_string(i), 2.718281828 * i, 3.1415926539*i);
 		config.AddTextField(std::string("text_field_") + std::to_string(i), std::string("no-default"), std::string("tfield")+ std::to_string(i));
 	}
+	cout << "Storing INI into 'aconfig.ini'. ";
+	config.Store("aconfig.ini");
+	cout << "Done\n";
 	cout << "Dumping into 'dump1.txt'\n";
 	config.DumpFields(ackNone, "dump1.txt");
 	cout << "copied \n";
-	config1.CopyFrom(config);
+	config1 = config;
 	cout << "Dumping copy into 'dump1_copied.txt'\n";
 	config.DumpFields(ackNone, "dump1_copied.txt");
 
