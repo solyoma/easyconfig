@@ -53,7 +53,7 @@ void ShowElem(std::ostream &ofs, FIELD_BASE *pf)
 
 int main()
 {
-	for (int i = 0; i < 20; ++i)
+	for (int i = 0; i < 5; ++i)
 	{
 		config.AddBoolField(std::string("bool_field_") + std::to_string(i), false, true);
 		config.AddIntField (std::string("int_field_") + std::to_string(i), 2*i, i);
@@ -70,8 +70,8 @@ int main()
 	cout << "Dumping copy into 'dump1_copied.txt'\n";
 	config.DumpFields(ackNone, "dump1_copied.txt");
 
-	cout << "Storing config1 into file 'aconfig.ini'\n";
-	config.Store("aconfig.ini");
+	cout << "Storing config1 into file 'aconfig1.ini'\n";
+	config1.Store("aconfig1.ini");
 	cout << "Reading back from 'aconfig.ini'\n";
 	config.Load("aconfig.ini");
 	cout << "dumping into dump2.txt";

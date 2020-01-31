@@ -52,6 +52,7 @@ class COMPOUND_FIELD;
 enum ACONFIG_KIND{ ackNone, ackBool, ackInt, ackReal, ackText, ackComp };
 
 String AconfigKindToString(ACONFIG_KIND);
+ACONFIG_KIND KindFromString(String s);
 
 struct FIELD_BASE
 {
@@ -200,12 +201,16 @@ public:
 class ACONFIG : public COMPOUND_FIELD
 {
 	void _Store(Settings &s, FIELD_BASE *pf);
+	void _AddFieldFromSettings(Settings &s, String name);
 public:
-	ACONFIG() : COMPOUND_FIELD("\\") {}
+	ACONFIG() : COMPOUND_FIELD("/") {}
+	~ACONFIG() {}
+
+	ACONFIG &operator=(const ACONFIG &other) { COMPOUND_FIELD::operator=(other);  return *this;  }
 
 	void Load(String fname);	// from ini file
 	void Store(String fname);
-		// DEBUG
+
+	// DEBUG
 	void DumpFields(ACONFIG_KIND kind = ackNone, String file=String());	// print all
-	ACONFIG &operator=(const ACONFIG &other) { COMPOUND_FIELD::operator=(other);  return *this;  }
 };

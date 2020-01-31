@@ -14,9 +14,25 @@ String AconfigKindToString(ACONFIG_KIND kind)
 	}
 }
 
+ACONFIG_KIND KindFromString(String s)
+{
+	switch (s[0])
+	{
+		case 'b': return ackBool;
+		case 'c': return ackComp;
+		case 'i': return ackInt;
+		case 'r': return ackReal;
+		case 't': return ackText;
+	}
+	return ACONFIG_KIND();
+}
+
 
 void BOOL_FIELD::Store(Settings &s)
 {
+	if (!changed)
+		return;
+
 	if (value != defVal)
 	{
 		s.beginGroup(name);
@@ -43,6 +59,9 @@ void BOOL_FIELD::Retrieve(Settings & s)
 
 void INT_FIELD::Store(Settings &s)
 {
+	if (!changed)
+		return;
+
 	if (value != defVal)
 	{
 		s.beginGroup(name);
@@ -68,6 +87,9 @@ void INT_FIELD::Retrieve(Settings & s)
 
 void REAL_FIELD::Store(Settings &s)
 {
+	if (!changed)
+		return;
+
 	if (value != defVal)
 	{
 		s.beginGroup(name);
@@ -93,6 +115,9 @@ void REAL_FIELD::Retrieve(Settings & s)
 
 void TEXT_FIELD::Store(Settings &s)
 {
+	if (!changed)
+		return;
+
 	if (value != defVal)
 	{
 		s.beginGroup(name);
@@ -118,6 +143,9 @@ void TEXT_FIELD::Retrieve(Settings & s)
 
 void COMPOUND_FIELD::Store(Settings &s)
 {
+	if (!changed)
+		return;
+
 	s.beginGroup(name);
 		s.setValue("kind", "c");
 		s.setValue("value", value);
@@ -274,40 +302,75 @@ COMPOUND_FIELD &COMPOUND_FIELD::operator=(const COMPOUND_FIELD &other)
 
 void ACONFIG::Load(String fname)	// from ini file
 {
-	Settings s(fname);
+	Clear();		// all data
+
+	Settings s(fname);	   // reads into 's'
+
+	StringList sl = s.allKeys();	// create config. variables
+	size_t pos;
+	String name;
+	
+	for (auto key : sl)
+	{
+		pos = key.indexOf(SETTINGS_DELIMITER);
+		if (pos != NPOS)
+		{
+			if (key.left(pos) == name)
+				continue;
+			name = key.left(pos);
+			_AddFieldFromSettings(s, name);
+		}
+	}
 
 	changed = false;
 }
 
 void ACONFIG::_Store(Settings &s, FIELD_BASE *pf)
 {
-//	s.beginGroup(pf->name);
-//		s.setValue("kind", pf->kind);
 		switch (pf->kind)		// no variant type on std
 		{
-			case ackBool: s.setValue("value", static_cast<BOOL_FIELD*>(pf)->value);
-						s.setValue("default", static_cast<BOOL_FIELD*>(pf)->defVal);
+			case ackBool: static_cast<BOOL_FIELD*>(pf)->Store(s);
 						break;
-			case ackInt:  s.setValue("value", static_cast<INT_FIELD*>(pf)->value);
-						s.setValue("default", static_cast<INT_FIELD*>(pf)->defVal);
+			case ackInt:  static_cast<INT_FIELD*>(pf)->Store(s);
 						break;
-			case ackReal: s.setValue("value", static_cast<REAL_FIELD*>(pf)->value);
-						s.setValue("default", static_cast<REAL_FIELD*>(pf)->defVal);
+			case ackReal: static_cast<REAL_FIELD*>(pf)->Store(s);
 						break;
-			case ackText: s.setValue("value", static_cast<TEXT_FIELD*>(pf)->value);
-						s.setValue("default", static_cast<TEXT_FIELD*>(pf)->defVal);
+			case ackText: static_cast<TEXT_FIELD*>(pf)->Store(s);
 						break;
-			case ackComp: s.setValue("value", static_cast<COMPOUND_FIELD*>(pf)->value);
-						s.setValue("default", static_cast<COMPOUND_FIELD*>(pf)->defVal);
-						for (auto pfs : static_cast<ACONFIG*>(pf)->_fields)
-							_Store(s, pfs.second);
+			case ackComp: static_cast<COMPOUND_FIELD*>(pf)->Store(s);
 						break;
 			default: break;
 		}
-//	s.endGroup();
 }
 
-void ACONFIG::Store(String fname)
+void ACONFIG::_AddFieldFromSettings(Settings & s, String name)
+{
+	ACONFIG_KIND kind = KindFromString(s.value("kind", "u").toString());
+	switch (kind)
+	{
+		case ackBool:	s.beginGroup(name);
+							AddBoolField(name, s.value("defVal", false).toBool(), s.value("value", false).toBool());
+						s.endGroup();
+			break;
+		case ackInt:	s.beginGroup(name);
+							AddIntField(name, s.value("defVal", 0).toInt(), s.value("value", 0).toInt());
+						s.endGroup();
+						break;
+		case ackReal:	s.beginGroup(name);
+							AddRealField(name, s.value("defVal", 0.0).toDouble(), s.value("value", 0.0).toDouble());
+						s.endGroup();
+						break;
+		case ackText:	s.beginGroup(name);
+							AddTextField(name, s.value("defVal", "").toString(), s.value("value", "").toString());
+						s.endGroup();
+						break;
+		case ackComp:
+						break;
+			default: break;
+	}
+}
+
+void ACONFIG::Store(String fname)		// writes to disk on exit in ~Settings()
 {
 	Settings s(fname);
 
@@ -315,9 +378,7 @@ void ACONFIG::Store(String fname)
 	{
 		auto pf = pfs.second;
 		_Store(s, pf);
-
 	}
-
 	changed = false;
 }
 

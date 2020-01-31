@@ -47,6 +47,8 @@ public:
 using StringList = std::list<String>;
 using StringMap = std::map<String, String>;
 
+const char SETTINGS_DELIMITER = '/';	
+
 // pairs: ( <full name>, <value> )	<= <full name> = <value>
 // Example 
 //      pair								in ini file: 				using Settings(s)
@@ -84,6 +86,7 @@ protected:
 	std::vector<ValuePair> _values; 
 	bool _changed = false;
 	int _nVpIndex;	// in _values;
+	int _nSectNum;	// section index used in GetNextSection
 	String _group;	// actual group
 
 	bool _SetGroupRootFrom(char *buf)
@@ -117,15 +120,11 @@ protected:
 
 		int i = _Find(sKey);
 		if (i)
-		{
 			_values[i - 1].second = sValue;
-			_changed = true;
-		}
 		else
-		{
 			_values.push_back(std::make_pair(sKey, sValue));
-			_changed = true;
-		}
+
+		_changed = true;
 
 		return _values.size();
 	}
@@ -170,6 +169,19 @@ public:
 		return _values[_values.size() - 1].second;
 		
 	}
+
+	StringList allKeys()	// returns all keys all values or for a given group
+	{
+		StringList sl;
+
+		for (auto p : _values)
+		{
+			if (_group.isEmpty() ||  _group == p.first.left(_group.size()))
+				sl.push_back(p.first.mid(_group.size()) );
+		}
+		return sl;
+	}
+
 	String GetSection(String session_name) // all sub-strings for name
 	{
 		String s;
@@ -186,7 +198,7 @@ public:
 
 	void beginGroup(String s)
 	{
-		_group += s + "\\";
+		_group += s + SETTINGS_DELIMITER;
 	}
 
 	void endGroup()
@@ -194,7 +206,7 @@ public:
 		if (_group.isEmpty())
 			return;
 		_group = _group.left(_group.length() - 1);	// cut ending '\'
-		size_t ind = _group.lastIndexOf('\\');		// get start of last group
+		size_t ind = _group.lastIndexOf(SETTINGS_DELIMITER);		// get start of last group
 		if (ind != NPOS)
 			_group = _group.left(ind + 1);			// delete last group, leaving the '\'
 		else
@@ -210,11 +222,12 @@ public:
 		{
 			_values.clear();
 
-			while (ifs.getline(buf, 1024, '\n'))
+			while (!ifs.eof() && ifs.getline(buf, 1024, '\n'))
 			{
 				if(!_SetGroupRootFrom(buf))		// if [group name] => set _groups
 					_AddPair(buf);				// else add lines to actual group
 			}
+			_changed = false;					// same as on disk
 			return (int)_values.size();
 		}
 		return 0;
@@ -222,6 +235,14 @@ public:
 
 	void Write(String name)
 	{
+		std::ifstream ifs(name);	// check if file exists
+		if (ifs.is_open())
+		{
+			if (!_changed)		// nothing to write
+				return;
+		}
+
+		// always write if file did not exist
 		std::ofstream ofs(name);
 		if (!ofs.is_open() || ofs.bad())
 			throw "can't write";
@@ -231,7 +252,7 @@ public:
 
 		for (auto v : _values)
 		{
-			auto n = v.first.indexOf('\\');
+			auto n = v.first.indexOf(SETTINGS_DELIMITER);
 			if (n != NPOS)
 			{
 				s = v.first.left(n);		// first group ?
@@ -239,7 +260,7 @@ public:
 				{
 					_group = s;
 					ofs << "[" << s << "]\n";
-					len = s.length()+1;		// skip '\\'
+					len = s.length()+1;		// skip SETTINGS_DELIMITER
 				}
 				ofs << v.first.mid(len) << "=" << v.second << "\n";
 			}
@@ -253,6 +274,10 @@ public:
 		_AddPair(name,value);
 	}
 
+	void setValue(String name, const char *value)	// name relative to _group
+	{
+		_AddPair(name, String(value) );
+	}
 	//template<typename T> void setValue(String name, T value)
 	//{
 	//	setValue(name, std::to_string(value));
@@ -310,7 +335,7 @@ public:
 		if( _sIniName.isEmpty() || _sIniName != iniName) 
 			Read(iniName); 
 
-		if (_sIniName.isEmpty())
+		if (!_sIniName.isEmpty())
 			_changed = true;
 		_sIniName = iniName;
 	}
@@ -326,8 +351,6 @@ public:
 	~Settings()
 	{
 
-		if (!_changed)
-			return;
 		Write(_sIniName);
 	}
 
