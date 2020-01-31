@@ -14,10 +14,13 @@ static inline char *LTrim(char *pb)
 }
 static inline char *RTrim(char *buf)
 {
-	char *pb = buf + strlen(buf) -1;
-	while(pb != buf && std::isspace(*pb)) 
-		--pb;
-	*++pb = 0;
+	if (*buf)
+	{
+		char *pb = buf + strlen(buf) - 1;
+		while (pb != buf && std::isspace(*pb))
+			--pb;
+		*++pb = 0;
+	}
 	return buf;
 }
 

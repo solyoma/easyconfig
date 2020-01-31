@@ -101,15 +101,34 @@ protected:
 	
 	int _Find(String name)	// 0: not found, other *** index+1 *** of element
 	{						// name: full path name, e.g. s\b\c
-		_nVpIndex = 0;
+		_nVpIndex = 1;
 		for (auto p : _values)
 			if (p.first == name)
 				return _nVpIndex;
 			else
 				++_nVpIndex;
-		return _nVpIndex;
+		return 0;
 	}
 
+	size_t _AddPair(String sKey, String sValue)
+	{
+		if (!_group.isEmpty())
+			sKey = _group + sKey;
+
+		int i = _Find(sKey);
+		if (i)
+		{
+			_values[i - 1].second = sValue;
+			_changed = true;
+		}
+		else
+		{
+			_values.push_back(std::make_pair(sKey, sValue));
+			_changed = true;
+		}
+
+		return _values.size();
+	}
 	size_t _AddPair(char *buf) // format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
 	{
 		char *p = strchr(buf, '#');
@@ -122,33 +141,17 @@ protected:
 		String	sKey = String(Trim(buf)),
 				sValue = String(Trim(p));
 
-		if (!_group.isEmpty())
-			sKey = _group + sKey;
-
-		int i = _Find(sKey);
-		if (i)
-		{
-			_values.push_back(std::make_pair(sKey, sValue) );
-			_changed = true;
-		}
-		else
-		{
-			_values[i - 1].second = sValue;
-			_changed = true;
-		}
-
-		return _values.size();
+		return _AddPair(sKey, sValue);
 	}
 
-	size_t _AddPair(String s) // format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
+	size_t _AddPair(String s) // From line, format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
 	{
-		char buf[1024];
-		size_t len = s.length();
-		if (len > 1023)
-			len = 1023;
-		strncpy(buf, s.c_str(), len);
-		buf[len] = 0;
-		return _AddPair(buf);
+		size_t commentPos = s.indexOf('#'),
+				equPos = s.indexOf('=');
+		if (equPos == NPOS || equPos > commentPos)	// bad line: drop it
+			return 0;
+
+		return _AddPair(trim_copy((s.left(equPos))), trim_copy(s.mid(equPos + 1, commentPos)));
 	}
 
 public:
@@ -203,7 +206,7 @@ public:
 		std::ifstream ifs(name);
 		char buf[1024];
 
-		if (!ifs.bad())
+		if (ifs.is_open() && !ifs.bad())
 		{
 			_values.clear();
 
@@ -220,7 +223,7 @@ public:
 	void Write(String name)
 	{
 		std::ofstream ofs(name);
-		if (ofs.bad())
+		if (!ofs.is_open() || ofs.bad())
 			throw "can't write";
 		_group.clear();
 		String s;
@@ -235,16 +238,25 @@ public:
 				if (_group != s)
 				{
 					_group = s;
-					len = s.length();
 					ofs << "[" << s << "]\n";
+					len = s.length()+1;		// skip '\\'
 				}
-				ofs << s.mid(len) << "=" << v.second << "\n";
+				ofs << v.first.mid(len) << "=" << v.second << "\n";
 			}
 			else
 				ofs << v.first << v.second << "\n";
 		}
 	}
 
+	void setValue(String name, String value)	// name relative to _group
+	{
+		_AddPair(name,value);
+	}
+
+	//template<typename T> void setValue(String name, T value)
+	//{
+	//	setValue(name, std::to_string(value));
+	//}
 	void setValue(String name, bool value)	// name relative to _group
 	{
 		setValue(name, std::to_string(value));
@@ -256,12 +268,6 @@ public:
 	void setValue(String name, double value)	// name relative to _group
 	{
 		setValue(name, std::to_string(value));
-	}
-	void setValue(String name, String value)	// name relative to _group
-	{
-		if(_group.length())
-			name = name.mid(_group.length());
-		_AddPair(name + "=" + value);
 	}
 
 	ValueItem value(String name, String defVal)
@@ -299,8 +305,23 @@ class Settings	: public ValueVector
 
 public:
 	Settings() {};
-	Settings(String iniName) { if( ! _sIniName.isEmpty() && _sIniName != iniName) Read(iniName); }
-	Settings(String oName, String iniName) : _sIniName(iniName), _sOName(oName) { Read(iniName); }
+	Settings(String iniName) 
+	{ 
+		if( _sIniName.isEmpty() || _sIniName != iniName) 
+			Read(iniName); 
+
+		if (_sIniName.isEmpty())
+			_changed = true;
+		_sIniName = iniName;
+	}
+	Settings(String oName, String iniName) : _sOName(oName) 
+	{ 
+		if (_sIniName.isEmpty() || _sIniName != iniName) 
+			Read(iniName); 
+		if (_sIniName.isEmpty())
+			_changed = true;
+		_sIniName = iniName;
+	}
 	void Store() { Write(_sIniName); }
 	~Settings()
 	{

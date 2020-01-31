@@ -279,10 +279,10 @@ void ACONFIG::Load(String fname)	// from ini file
 	changed = false;
 }
 
-void ACONFIG::_Store(Settings s, FIELD_BASE *pf)
+void ACONFIG::_Store(Settings &s, FIELD_BASE *pf)
 {
-	s.beginGroup(pf->name);
-		s.setValue("kind", pf->kind);
+//	s.beginGroup(pf->name);
+//		s.setValue("kind", pf->kind);
 		switch (pf->kind)		// no variant type on std
 		{
 			case ackBool: s.setValue("value", static_cast<BOOL_FIELD*>(pf)->value);
@@ -304,7 +304,7 @@ void ACONFIG::_Store(Settings s, FIELD_BASE *pf)
 						break;
 			default: break;
 		}
-	s.endGroup();
+//	s.endGroup();
 }
 
 void ACONFIG::Store(String fname)
@@ -314,7 +314,7 @@ void ACONFIG::Store(String fname)
 	for (auto pfs : _fields)
 	{
 		auto pf = pfs.second;
-
+		_Store(s, pf);
 
 	}
 

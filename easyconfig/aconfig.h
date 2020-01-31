@@ -199,7 +199,7 @@ public:
 
 class ACONFIG : public COMPOUND_FIELD
 {
-	void _Store(Settings s, FIELD_BASE *pf);
+	void _Store(Settings &s, FIELD_BASE *pf);
 public:
 	ACONFIG() : COMPOUND_FIELD("\\") {}
 
