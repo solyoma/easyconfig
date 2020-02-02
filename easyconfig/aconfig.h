@@ -47,7 +47,7 @@ public:
 
 //**************************************
 
-class COMPOUND_FIELD;
+class ACONFIG;
 
 enum ACONFIG_KIND{ ackNone, ackBool, ackInt, ackReal, ackText, ackComp };
 
@@ -58,64 +58,100 @@ struct FIELD_BASE
 {
 	String name;
 	ACONFIG_KIND kind;
-	COMPOUND_FIELD *parent;
+	Settings &s;
+	ACONFIG *parent;
 
-	FIELD_BASE(String name, ACONFIG_KIND kind = ackNone, COMPOUND_FIELD *parent = nullptr) : name(name), kind(kind), parent(parent) { 	}
-	FIELD_BASE(const FIELD_BASE &fb) : FIELD_BASE(fb.name, fb.kind, fb.parent) {};
+	FIELD_BASE(Settings &s, String name, ACONFIG_KIND kind = ackNone, ACONFIG *parent = nullptr) : 
+				s(s),name(name), kind(kind), parent(parent) { 	}
+	FIELD_BASE(Settings &s, const FIELD_BASE &fb) : FIELD_BASE(s, fb.name, fb.kind, fb.parent) {};
 	FIELD_BASE &operator=(const FIELD_BASE &other)
 	{
 		name = other.name;
 		kind = other.kind;
 		parent = other.parent;
-		changed = changed;
+		s = other.s;
 
 		return *this;
 	}
 
-	bool changed = false;
-	virtual void Store(Settings &s) = 0;	 // - " -
-	virtual void Retrieve(Settings &ofs) = 0;
+	virtual void Store() = 0;	 // - " -
+	virtual void Retrieve() = 0;
 	virtual String ToString() const = 0;
 	virtual	String DefToString() const = 0;
 	virtual bool NotDefault() const = 0;
-	void SetChanged(bool changed) { changed = changed; }
-
 };
 
-struct BOOL_FIELD : public FIELD_BASE
+class BOOL_FIELD : public FIELD_BASE
 {
-	bool value;
-	bool defVal;
-	BOOL_FIELD(String aname, bool aDefVal =false, bool val=false, COMPOUND_FIELD *aparent = nullptr) :
-		FIELD_BASE(aname, ackBool, aparent), value(val), defVal(aDefVal) {}
-	BOOL_FIELD(const BOOL_FIELD &bf) : BOOL_FIELD(bf.name, bf.defVal, bf.value, bf.parent) {}
-	void Store(Settings &s);
-	virtual void Retrieve(Settings &ofs);
-	String ToString() const { return value ? "TRUE" : "FALSE"; }
-	String DefToString() const { return defVal ? "TRUE" : "FALSE"; }
-	virtual bool NotDefault() const { return value != defVal; }
+	bool _value;
+	bool _defVal;
+public:
+	BOOL_FIELD(Settings &s, String aname, bool a_defVal =false, bool val=false, ACONFIG *aparent = nullptr) :
+		FIELD_BASE(s, aname, ackBool, aparent), _value(val), _defVal(a_defVal) {}
+	BOOL_FIELD(Settings &s, const BOOL_FIELD &bf) : BOOL_FIELD(s, bf.name, bf._defVal, bf._value, bf.parent) {}
+
+	virtual void SetValue(bool val)
+	{
+		_value = val;
+		s.beginGroup(name);
+			s.setValue("value", val);
+		s.endGroup();
+	}
+	virtual bool Value() const { return _value; }
+	virtual void SetDefault(bool def)
+	{
+		_defVal = def;
+		s.beginGroup(name);
+			s.setValue("default", def);
+		s.endGroup();
+	}
+	virtual bool Default() const { return _defVal; }
+
+	void Store();
+	virtual void Retrieve();
+	String ToString() const { return _value ? "TRUE" : "FALSE"; }
+	String DefToString() const { return _defVal ? "TRUE" : "FALSE"; }
+	virtual bool NotDefault() const { return _value != _defVal; }
 	BOOL_FIELD& operator=(bool newVal);
-	BOOL_FIELD &operator=(const BOOL_FIELD &other) { FIELD_BASE::operator=(other); value = other.value; defVal = other.defVal; ; return *this; }
+	BOOL_FIELD &operator=(const BOOL_FIELD &other) { FIELD_BASE::operator=(other); _value = other._value; _defVal = other._defVal; ; return *this; }
 };
 
 struct INT_FIELD : public FIELD_BASE
 {
-	int value = 0;
-	int defVal = 0;		// if Load() is unsuccesfull use this
-	INT_FIELD(String aname, int defVal = 0, int val = 0, COMPOUND_FIELD *aparent = nullptr) : 
-		FIELD_BASE(aname, ackInt, aparent), value(val), defVal(defVal) {}
-	INT_FIELD(const INT_FIELD &bf) : INT_FIELD(bf.name, bf.defVal, bf.value, bf.parent) {}
+	int _value = 0;
+	int _defVal = 0;		// if Load() is unsuccesfull use this
+public:
+	INT_FIELD(Settings &s,String aname, int _defVal = 0, int val = 0, ACONFIG *aparent = nullptr) :
+		FIELD_BASE(s, aname, ackInt, aparent), _value(val), _defVal(_defVal) {}
+	INT_FIELD(Settings &s, const INT_FIELD &bf) : INT_FIELD(s,bf.name, bf._defVal, bf._value, bf.parent) {}
+
+	virtual void SetValue(int val)
+	{
+		_value = val;
+		s.beginGroup(name);
+		s.setValue("value", val);
+		s.endGroup();
+	}
+	virtual int Value() const { return _value; }
+	virtual void SetDefault(int def)
+	{
+		_defVal = def;
+		s.beginGroup(name);
+		s.setValue("default", def);
+		s.endGroup();
+	}
+	virtual bool Default() const { return _defVal; }
 
 	String ToString(int digits) const
 	{
-		String s = std::to_string(value);
+		String s = std::to_string(_value);
 		s = String(digits, '0') + s;
 		return digits ? s.substr(s.length() - digits) : s;
 	}
 	String ToHexString(int digits = 0, bool prefix = false) const
 	{
 		char buf[32];
-		sprintf(buf, "%*x", digits, value);
+		sprintf(buf, "%*x", digits, _value);
 		String s = buf;
 		if (digits > 0)
 			s = s.substr(s.length() - digits);
@@ -123,47 +159,83 @@ struct INT_FIELD : public FIELD_BASE
 		return prefix ? "0x" + s : s;
 	}
 
-	void Store(Settings &s);
-	virtual void Retrieve(Settings &ofs);
-	String ToString() const { return std::to_string(value); }
-	String DefToString() const { return std::to_string(defVal); }
-	virtual bool NotDefault() const { return value != defVal; }
+	void Store();
+	virtual void Retrieve();
+	String ToString() const { return std::to_string(_value); }
+	String DefToString() const { return std::to_string(_defVal); }
+	virtual bool NotDefault() const { return _value != _defVal; }
 	INT_FIELD& operator=(int newVal);
-	INT_FIELD &operator=(const INT_FIELD &other) { FIELD_BASE::operator=(other); value = other.value; defVal = other.defVal; return *this; }
+	INT_FIELD &operator=(const INT_FIELD &other) { FIELD_BASE::operator=(other); _value = other._value; _defVal = other._defVal; return *this; }
 };
 
 struct REAL_FIELD : public FIELD_BASE
 {
-	double value = 0;
-	double defVal = 0;		// if Load() is unsuccesfull use this
-	REAL_FIELD(String aname, double defVal = 0.0, double val = 0.0, COMPOUND_FIELD *aparent = nullptr) :
-		FIELD_BASE(aname, ackReal, aparent), value(val), defVal(defVal) {}
-	REAL_FIELD(const REAL_FIELD &bf) : REAL_FIELD(bf.name, bf.defVal, bf.value, bf.parent) {}
+	double _value = 0;
+	double _defVal = 0;		// if Load() is unsuccesfull use this
+public:
+	REAL_FIELD(Settings &s, String aname, double _defVal = 0.0, double val = 0.0, ACONFIG *aparent = nullptr) :
+		FIELD_BASE(s, aname, ackReal, aparent), _value(val), _defVal(_defVal) {}
+	REAL_FIELD(Settings &s, const REAL_FIELD &bf) : REAL_FIELD(s, bf.name, bf._defVal, bf._value, bf.parent) {}
 
-	void Store(Settings &s);
-	virtual void Retrieve(Settings &ofs);
+	virtual void SetValue(double val)
+	{
+		_value = val;
+		s.beginGroup(name);
+		s.setValue("value", val);
+		s.endGroup();
+	}
+	virtual double Value() const { return _value; }
+	virtual void SetDefault(double def)
+	{
+		_defVal = def;
+		s.beginGroup(name);
+		s.setValue("default", def);
+		s.endGroup();
+	}
+	virtual double Default() const { return _defVal; }
 
-	String ToString() const { return std::to_string(value); }
-	String DefToString() const { return std::to_string(defVal); }
-	virtual bool NotDefault() const { return value != defVal; }
+	void Store();
+	virtual void Retrieve();
+
+	String ToString() const { return std::to_string(_value); }
+	String DefToString() const { return std::to_string(_defVal); }
+	virtual bool NotDefault() const { return _value != _defVal; }
 	REAL_FIELD& operator=(double newVal);
-	REAL_FIELD &operator=(const REAL_FIELD &other) { FIELD_BASE::operator=(other); value = other.value; defVal = other.defVal; ; return *this; }
+	REAL_FIELD &operator=(const REAL_FIELD &other) { FIELD_BASE::operator=(other); _value = other._value; _defVal = other._defVal; ; return *this; }
 };
 
 struct TEXT_FIELD : public FIELD_BASE
 {
-	String value;
-	String defVal;		// if Load() is unsuccesfull use this
-	TEXT_FIELD(String aname, String aDefVal = String(), String val = String() , COMPOUND_FIELD *aparent = nullptr) :
-		FIELD_BASE(aname, ackText, aparent), defVal(aDefVal), value(val) {}
-	TEXT_FIELD(const TEXT_FIELD &bf) : TEXT_FIELD(bf.name, bf.defVal, bf.value, bf.parent) {}
+	String _value;
+	String _defVal;		// if Load() is unsuccesfull use this
+public:
+	TEXT_FIELD(Settings &s, String aname, String a_defVal = String(), String val = String() , ACONFIG *aparent = nullptr) :
+		FIELD_BASE(s, aname, ackText, aparent), _defVal(a_defVal), _value(val) {}
+	TEXT_FIELD(Settings &s, const TEXT_FIELD &bf) : TEXT_FIELD(s, bf.name, bf._defVal, bf._value, bf.parent) {}
 
-	void Store(Settings &s);
-	virtual void Retrieve(Settings &ofs);
+	virtual void SetValue(String val)
+	{
+		_value = val;
+		s.beginGroup(name);
+		s.setValue("value", val);
+		s.endGroup();
+	}
+	virtual String Value() const { return _value; }
+	virtual void SetDefault(String def)
+	{
+		_defVal = def;
+		s.beginGroup(name);
+		s.setValue("default", def);
+		s.endGroup();
+	}
+	virtual String Default() const { return _defVal; }
 
-	String ToString() const { return value; }
-	String DefToString() const { return defVal; }
-	virtual bool NotDefault() const { return value != defVal; }
+	void Store();
+	virtual void Retrieve();
+
+	String ToString() const { return _value; }
+	String DefToString() const { return _defVal; }
+	virtual bool NotDefault() const { return _value != _defVal; }
 	TEXT_FIELD& operator=(String newVal);
 };
 
@@ -179,37 +251,58 @@ protected:
 
 	void _CopyLists(const COMPOUND_FIELD &other);
 public:
-	COMPOUND_FIELD(String aname, String aDefVal = String(), String val = String(), COMPOUND_FIELD* aparent = nullptr) :
-		TEXT_FIELD(aname, aDefVal, val, aparent) {}
-	COMPOUND_FIELD(const COMPOUND_FIELD &bf) : COMPOUND_FIELD(bf.name, bf.defVal, bf.value, bf.parent) {}
+	COMPOUND_FIELD(Settings &s, String aname, String aDefVal = String(), String val = String(), ACONFIG* aparent = nullptr) :
+		TEXT_FIELD(s, aname, aDefVal, val, aparent) {}
+	COMPOUND_FIELD(Settings &s, const COMPOUND_FIELD &bf) : COMPOUND_FIELD(s, bf.name, bf._defVal, bf._value, bf.parent) {}
 
 	COMPOUND_FIELD &operator=(const COMPOUND_FIELD &other);
 	FIELD_BASE *operator[](String fieldn);
 
-	void Clear() { _boolList.clear(); _intList.clear(); _realList.clear(); _textList.clear(); _fields.clear(); changed = false; }
+	void Clear() { _boolList.clear(); _intList.clear(); _realList.clear(); _textList.clear(); _fields.clear(); }
 	size_t Size(ACONFIG_KIND kind = ackNone) const;
 
-	void AddBoolField(String name, bool defVal = false, bool val = false);
-	void AddIntField(String name, int defVal = 0, int val = 0);
-	void AddRealField(String name, double defVal = 0.0, double val = 0.0);
-	void AddTextField(String name, String defVal = String(), String val = String());
+	void AddBoolField(Settings &s, String name, bool _defVal = false, bool val = false);
+	void AddIntField (Settings &s, String name, int _defVal = 0, int val = 0);
+	void AddRealField(Settings &s, String name, double _defVal = 0.0, double val = 0.0);
+	void AddTextField(Settings &s, String name, String _defVal = String(), String val = String());
 
-	void Store(Settings &s);
-	virtual void Retrieve(Settings &ofs);
+	void Store();
+	virtual void Retrieve();
 };
 
 class ACONFIG : public COMPOUND_FIELD
 {
-	void _Store(Settings &s, FIELD_BASE *pf);
+	Settings _settings;		// changed ini is automatically written in destructor of Settings
+							// but can be saved any time using 'Save()'
+	bool _changed = false;
+
+	void _Store(FIELD_BASE *pf);
 	void _AddFieldFromSettings(Settings &s, String name);
 public:
-	ACONFIG() : COMPOUND_FIELD("/") {}
+	ACONFIG() : COMPOUND_FIELD(_settings, "/") {}
+	ACONFIG(String iniName) : COMPOUND_FIELD(_settings, "/") { _settings.SetName(iniName); }
 	~ACONFIG() {}
 
-	ACONFIG &operator=(const ACONFIG &other) { COMPOUND_FIELD::operator=(other);  return *this;  }
+	void SetName(String iniName) { _settings.SetName(iniName); }
 
-	void Load(String fname);	// from ini file
-	void Store(String fname);
+	ACONFIG &operator=(const ACONFIG &other) 
+	{ 
+		COMPOUND_FIELD::operator=(other);  
+		_settings = other._settings;
+		_changed = other._changed;
+		return *this;  
+	}
+
+	void AddBoolField(String name, bool defVal = false, bool val = false) { COMPOUND_FIELD::AddBoolField(_settings, name, defVal, val); }
+	void AddIntField(String name, int defVal = 0, int val = 0) { COMPOUND_FIELD::AddIntField(_settings, name, defVal, val); }
+	void AddRealField(String name, double defVal = 0.0, double val = 0.0) { COMPOUND_FIELD::AddRealField(_settings, name, defVal, val); }
+	void AddTextField(String name, String defVal = String(), String val = String()) { COMPOUND_FIELD::AddTextField(_settings, name, defVal, val); }
+
+	void Store();				// in _settings
+	void Load(String iniName);	// from ini file
+	void Save() {	_settings.Save();	}				// into ini file it was Load()-ed from
+	void Save(String iniName) { _settings.Save(iniName); }	// to ini file 
+	void SetChanged(bool set) { _changed = set; }
 
 	// DEBUG
 	void DumpFields(ACONFIG_KIND kind = ackNone, String file=String());	// print all

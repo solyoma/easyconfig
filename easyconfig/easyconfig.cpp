@@ -3,7 +3,6 @@
 
 #include "aconfig.h"
 
-ACONFIG config, config1;
 
 using std::cout;
 
@@ -29,21 +28,21 @@ void ShowElem(std::ostream &ofs, FIELD_BASE *pf)
 			break;
 		case ackInt: {
 						INT_FIELD *pif = static_cast<INT_FIELD*>(pf);
-						cout << AconfigKindToString(ackInt) << " with default " << pif->defVal
-							<< " value " << pif->value << "\n";
+						cout << AconfigKindToString(ackInt) << " with default " << pif->Default()
+							<< " value " << pif->Value() << "\n";
 					 }
 			break;
 
 		case ackReal: {
 						REAL_FIELD *pif = static_cast<REAL_FIELD*>(pf);
-						cout << AconfigKindToString(ackReal) << " with default " << pif->defVal
-							<< " value " << pif->value << "\n";
+						cout << AconfigKindToString(ackReal) << " with default " << pif->Default()
+							<< " value " << pif->Value() << "\n";
 					  }
 			break;
 		case ackText: {
 						TEXT_FIELD *pif = static_cast<TEXT_FIELD*>(pf);
-						cout << AconfigKindToString(ackText) << " with default: " << pif->defVal
-							<< ", value: " << pif->value << "\n";
+						cout << AconfigKindToString(ackText) << " with default: " << pif->Default()
+							<< ", value: " << pif->Value() << "\n";
 					 }
 			break;
 		}
@@ -53,6 +52,9 @@ void ShowElem(std::ostream &ofs, FIELD_BASE *pf)
 
 int main()
 {
+	ACONFIG config("Aconfig.ini"), 
+			config1;
+
 	for (int i = 0; i < 5; ++i)
 	{
 		config.AddBoolField(std::string("bool_field_") + std::to_string(i), false, true);
@@ -60,8 +62,9 @@ int main()
 		config.AddRealField(std::string("real_field_") + std::to_string(i), 2.718281828 * i, 3.1415926539*i);
 		config.AddTextField(std::string("text_field_") + std::to_string(i), std::string("no-default"), std::string("tfield")+ std::to_string(i));
 	}
-	cout << "Storing INI into 'aconfig.ini'. ";
-	config.Store("aconfig.ini");
+	cout << "Storing INI into 'aconfig.ini', then saving it";
+	config.Store(); 
+	config.Save();
 	cout << "Done\n";
 	cout << "Dumping into 'dump1.txt'\n";
 	config.DumpFields(ackNone, "dump1.txt");
@@ -69,9 +72,9 @@ int main()
 	config1 = config;
 	cout << "Dumping copy into 'dump1_copied.txt'\n";
 	config.DumpFields(ackNone, "dump1_copied.txt");
-
 	cout << "Storing config1 into file 'aconfig1.ini'\n";
-	config1.Store("aconfig1.ini");
+//	config1.Store(); 
+	config1.Save("aconfig1.ini");
 	cout << "Reading back from 'aconfig.ini'\n";
 	config.Load("aconfig.ini");
 	cout << "dumping into dump2.txt";

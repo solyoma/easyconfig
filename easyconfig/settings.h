@@ -1,4 +1,5 @@
 #pragma once
+#include <sys/stat.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -84,7 +85,7 @@ class ValueVector
 {
 protected:
 	std::vector<ValuePair> _values; 
-	bool _changed = false;
+	bool _notSaved = false;
 	int _nVpIndex;	// in _values;
 	int _nSectNum;	// section index used in GetNextSection
 	String _group;	// actual group
@@ -96,7 +97,7 @@ protected:
 			char *p = strchr(buf, ']');
 			if (!p)
 				throw "bad section head";
-			_group = String(buf + 1).left((p - buf) - 1) + "\\";
+			_group = String(buf + 1).left((p - buf) - 1) + SETTINGS_DELIMITER;
 			return true;
 		}
 		return false;
@@ -120,15 +121,20 @@ protected:
 
 		int i = _Find(sKey);
 		if (i)
-			_values[i - 1].second = sValue;
+		{
+			if( (_notSaved |= (_values[i - 1].second != sValue) )) // make sure _notSaved is not reset to false
+				_values[i - 1].second = sValue;
+		}
 		else
+		{
 			_values.push_back(std::make_pair(sKey, sValue));
-
-		_changed = true;
+			_notSaved = true;
+		}
 
 		return _values.size();
 	}
-	size_t _AddPair(char *buf) // format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
+	// format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
+	size_t _AddPair(char *buf) 
 	{
 		char *p = strchr(buf, '#');
 		if (p)
@@ -142,8 +148,8 @@ protected:
 
 		return _AddPair(sKey, sValue);
 	}
-
-	size_t _AddPair(String s) // From line, format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
+	// From line, format : [<white space>]<text>[<white space>]=[<white space>]<text>[<whitespace>][#<comment>]
+	size_t _AddPair(String s) 
 	{
 		size_t commentPos = s.indexOf('#'),
 				equPos = s.indexOf('=');
@@ -158,6 +164,7 @@ public:
 	{
 		return _Find(name);
 	}
+	bool Saved() const { return !_notSaved; }
 
 	String &operator[](String name)	   // if name is not present adds new pair with empty value
 	{
@@ -224,25 +231,23 @@ public:
 
 			while (!ifs.eof() && ifs.getline(buf, 1024, '\n'))
 			{
-				if(!_SetGroupRootFrom(buf))		// if [group name] => set _groups
+				if (!_SetGroupRootFrom(buf))		// if [group name] => set _groups
 					_AddPair(buf);				// else add lines to actual group
 			}
-			_changed = false;					// same as on disk
+			_notSaved = false;					// same as on disk
+			_group.clear();						// not inside any group
 			return (int)_values.size();
 		}
+		else
+			_notSaved = true;					// not on disk yet
 		return 0;
 	}
 
-	void Write(String name)
+	void Write(String name)	// write into file
 	{
-		std::ifstream ifs(name);	// check if file exists
-		if (ifs.is_open())
-		{
-			if (!_changed)		// nothing to write
-				return;
-		}
+		if (Saved() )		// already
+			return;
 
-		// always write if file did not exist
 		std::ofstream ofs(name);
 		if (!ofs.is_open() || ofs.bad())
 			throw "can't write";
@@ -267,6 +272,8 @@ public:
 			else
 				ofs << v.first << v.second << "\n";
 		}
+		_group.clear();
+		_notSaved = false;	// same as file content
 	}
 
 	void setValue(String name, String value)	// name relative to _group
@@ -325,35 +332,62 @@ public:
  *-------------------------------------------------------*/
 class Settings	: public ValueVector
 {
-	String	_sIniName,		// name of input/output files
+	String	_sIniName,		// name of input file
 			_sOName;		// special name for e.g. organization
 
+	void _Save(String name)
+	{
+		if (name == _sIniName)
+		{
+			if (!_notSaved)
+				return;
+		}
+		else
+		{
+			_sIniName = name;
+			_notSaved = true;
+		}
+
+		//struct stat st;	// check if file exists
+		//if (stat(name.c_str(), &st) == 0 && !_notSaved)		// nothing to write
+		//	return;
+		// always write if file did not exist or different from the one read in
+		Write(name);
+	}
 public:
 	Settings() {};
-	Settings(String iniName) 
-	{ 
-		if( _sIniName.isEmpty() || _sIniName != iniName) 
-			Read(iniName); 
+	Settings(String iniName) { SetName(iniName); }
+	Settings(String oName, String iniName) : _sOName(oName) { SetName(iniName);	}
+	void SetName(String iniName)
+	{
+		if (_sIniName.isEmpty() || _sIniName != iniName)
+		{
+			Read(iniName);
+			_notSaved = false;	// same as on disk
+		}
+		_sIniName = iniName;
+	}
+	void SetNames(String oName, String iniName) { _sOName = oName; SetName(iniName); }
 
-		if (!_sIniName.isEmpty())
-			_changed = true;
+	void Load(String iniName) 
+	{
 		_sIniName = iniName;
+		Read(iniName);
 	}
-	Settings(String oName, String iniName) : _sOName(oName) 
+	void Save() 
 	{ 
-		if (_sIniName.isEmpty() || _sIniName != iniName) 
-			Read(iniName); 
-		if (_sIniName.isEmpty())
-			_changed = true;
-		_sIniName = iniName;
+		_Save(_sIniName); 
 	}
-	void Store() { Write(_sIniName); }
+
+	void Save(String name)
+	{
+		_Save(name);
+	}
+
 	~Settings()
 	{
-
-		Write(_sIniName);
+		_Save(_sIniName);
 	}
 
-	void SetNames(String oName, String iniName) { _sIniName = iniName; _sOName = oName; Read(iniName); }
 };
 
