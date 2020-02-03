@@ -1,5 +1,7 @@
 #pragma once
 #include "settings.h"
+#include <stack>
+#include <memory>
 
 //******************************************
 // splittable string http://www.cplusplus.com/articles/1UqpX9L8/
@@ -247,9 +249,11 @@ protected:
 	std::list<INT_FIELD> _intList;
 	std::list<REAL_FIELD> _realList;
 	std::list<TEXT_FIELD> _textList;
-	std::list<TEXT_FIELD> _compList;
+	std::list<COMPOUND_FIELD> _compList;
 
 	void _CopyLists(const COMPOUND_FIELD &other);
+	// DEBUG
+	void _DumpFields(std::ostream &ofs, ACONFIG_KIND kind = ackNone);
 public:
 	COMPOUND_FIELD(Settings &s, String aname, String aDefVal = String(), String val = String(), ACONFIG* aparent = nullptr) :
 		TEXT_FIELD(s, aname, aDefVal, val, aparent) {}
@@ -258,52 +262,117 @@ public:
 	COMPOUND_FIELD &operator=(const COMPOUND_FIELD &other);
 	FIELD_BASE *operator[](String fieldn);
 
-	void Clear() { _boolList.clear(); _intList.clear(); _realList.clear(); _textList.clear(); _fields.clear(); }
+	void Clear() 
+	{
+		_boolList.clear(); _intList.clear(); _realList.clear(); _textList.clear(); _compList.clear();
+		_fields.clear();
+		s.clear();
+	}
 	size_t Size(ACONFIG_KIND kind = ackNone) const;
 
 	void AddBoolField(Settings &s, String name, bool _defVal = false, bool val = false);
 	void AddIntField (Settings &s, String name, int _defVal = 0, int val = 0);
 	void AddRealField(Settings &s, String name, double _defVal = 0.0, double val = 0.0);
 	void AddTextField(Settings &s, String name, String _defVal = String(), String val = String());
+	COMPOUND_FIELD * AddCompField(Settings &s, String name, String _defVal = String(), String val = String());
 
 	void Store();
 	virtual void Retrieve();
+	// DEBUG
+	void DumpFields(ACONFIG_KIND kind = ackNone, String file=String());	// print all
 };
 
-class ACONFIG : public COMPOUND_FIELD
+class ACONFIG 
 {
 	Settings _settings;		// changed ini is automatically written in destructor of Settings
+	COMPOUND_FIELD *_pFields;
 							// but can be saved any time using 'Save()'
 	bool _changed = false;
 
 	void _Store(FIELD_BASE *pf);
 	void _AddFieldFromSettings(Settings &s, String name);
+	COMPOUND_FIELD *_pc = nullptr;		// used for embedded compound fields, set when using AddCompField(), reset at EndCompField()
+	std::stack<COMPOUND_FIELD *, std::vector<COMPOUND_FIELD*> > _compStack;
 public:
-	ACONFIG() : COMPOUND_FIELD(_settings, "/") {}
-	ACONFIG(String iniName) : COMPOUND_FIELD(_settings, "/") { _settings.SetName(iniName); }
+	ACONFIG() 
+	{ 
+		_pFields = new COMPOUND_FIELD(_settings, String()); 
+		_compStack.push(_pFields);
+		_pc = _pFields;
+	}
+	ACONFIG(String iniName) :ACONFIG()
+	{ 
+		_settings.SetName(iniName); 
+	}
 	~ACONFIG() {}
 
 	void SetName(String iniName) { _settings.SetName(iniName); }
 
 	ACONFIG &operator=(const ACONFIG &other) 
 	{ 
-		COMPOUND_FIELD::operator=(other);  
+		*_pFields = *other._pFields;
+
 		_settings = other._settings;
 		_changed = other._changed;
 		return *this;  
 	}
 
-	void AddBoolField(String name, bool defVal = false, bool val = false) { COMPOUND_FIELD::AddBoolField(_settings, name, defVal, val); }
-	void AddIntField(String name, int defVal = 0, int val = 0) { COMPOUND_FIELD::AddIntField(_settings, name, defVal, val); }
-	void AddRealField(String name, double defVal = 0.0, double val = 0.0) { COMPOUND_FIELD::AddRealField(_settings, name, defVal, val); }
-	void AddTextField(String name, String defVal = String(), String val = String()) { COMPOUND_FIELD::AddTextField(_settings, name, defVal, val); }
+	FIELD_BASE *operator[](String fieldn)
+	{
+		return _pFields->operator[](fieldn);
+	}
+
+	void Clear()
+	{
+		_pFields->Clear();
+		while (_compStack.size() != 1)
+			_compStack.pop();
+	}
+
+	void AddBoolField(String name, bool defVal = false, bool val = false) 
+	{ 
+		_pc->AddBoolField(_settings, name, defVal, val); 
+		_changed = true;
+	}
+	void AddIntField(String name, int defVal = 0, int val = 0) 
+	{
+		_pc->AddIntField(_settings, name, defVal, val);
+		_changed = true;
+	}
+	void AddRealField(String name, double defVal = 0.0, double val = 0.0) 
+	{
+		_pc->AddRealField(_settings, name, defVal, val);
+		_changed = true;
+	}
+	void AddTextField(String name, String defVal = String(), String val = String()) 
+	{ 
+		_pc->AddTextField(_settings, name, defVal, val);
+		_changed = true;
+	}
+	COMPOUND_FIELD* AddCompField(String name, String defVal = String(), String val = String()) 
+	{ 
+		_changed = true;
+		COMPOUND_FIELD *pc = _pc->AddCompField(_settings, name, defVal, val);
+		_compStack.push(pc);
+		_pc = pc;
+	}
+	void EndCompField()			// call after AddCompField
+	{ 
+		if (!_compStack.empty()) 
+		{
+			_compStack.pop(); 
+			_pc = _compStack.top(); 
+		} 
+	}
+
+
 
 	void Store();				// in _settings
 	void Load(String iniName);	// from ini file
 	void Save() {	_settings.Save();	}				// into ini file it was Load()-ed from
 	void Save(String iniName) { _settings.Save(iniName); }	// to ini file 
 	void SetChanged(bool set) { _changed = set; }
-
 	// DEBUG
-	void DumpFields(ACONFIG_KIND kind = ackNone, String file=String());	// print all
+	void DumpFields(ACONFIG_KIND kind = ackNone, String file = String()) { _pFields->DumpFields(kind, file); }
+
 };

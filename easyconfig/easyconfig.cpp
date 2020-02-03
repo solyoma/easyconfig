@@ -60,7 +60,9 @@ int main()
 		config.AddBoolField(std::string("bool_field_") + std::to_string(i), false, true);
 		config.AddIntField (std::string("int_field_") + std::to_string(i), 2*i, i);
 		config.AddRealField(std::string("real_field_") + std::to_string(i), 2.718281828 * i, 3.1415926539*i);
-		config.AddTextField(std::string("text_field_") + std::to_string(i), std::string("no-default"), std::string("tfield")+ std::to_string(i));
+		config.AddTextField(std::string("text_field_") + std::to_string(i), 
+							std::string("default_") + std::to_string(i), 
+							std::string("tfield")+ std::to_string(i)		);
 	}
 	cout << "Storing INI into 'aconfig.ini', then saving it";
 	config.Store(); 
@@ -81,9 +83,9 @@ int main()
 	config.DumpFields(ackNone, "dump2.txt");
 	cout << "\nIndexing test:\n";
 
-	ShowElem(cout, config["real_field_7"]);
+	ShowElem(cout, config["real_field_2"]);
 	ShowElem(cout, config["bool_field_4"]);
-	ShowElem(cout, config["int_field_10"]);
+	ShowElem(cout, config["int_field_1"]);
 	ShowElem(cout, config["text_field_3"]);
 
 	cout << "\nReady.\n";

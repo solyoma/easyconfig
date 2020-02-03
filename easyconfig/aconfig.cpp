@@ -30,14 +30,11 @@ ACONFIG_KIND KindFromString(String s)
 
 void BOOL_FIELD::Store()
 {
-	if(_value != _defVal)
-	{
-		s.beginGroup(name);
-			s.setValue("kind", "b");
-			s.setValue("value", _value);
-			s.setValue("default", _defVal);
-		s.endGroup();
-	}
+	s.beginGroup(name);
+		s.setValue("kind", "b");
+		s.setValue("value", _value);
+		s.setValue("default", _defVal);
+	s.endGroup();
 }
 
 void BOOL_FIELD::Retrieve()
@@ -53,14 +50,11 @@ void BOOL_FIELD::Retrieve()
 
 void INT_FIELD::Store()
 {
-	if(_value != _defVal)
-	{
-		s.beginGroup(name);
-			s.setValue("kind", "i");
-			s.setValue("value", _value);
-			s.setValue("default", _defVal);
-		s.endGroup();
-	}
+	s.beginGroup(name);
+		s.setValue("kind", "i");
+		s.setValue("value", _value);
+		s.setValue("default", _defVal);
+	s.endGroup();
 }
 
 void INT_FIELD::Retrieve()
@@ -76,14 +70,11 @@ void INT_FIELD::Retrieve()
 
 void REAL_FIELD::Store()
 {
-	if(_value != _defVal)
-	{
 		s.beginGroup(name);
 			s.setValue("kind", "r");
 			s.setValue("value", _value);
-			s.setValue("default:", _defVal);
+			s.setValue("default", _defVal);
 		s.endGroup();
-	}
 }
 
 void REAL_FIELD::Retrieve()
@@ -98,14 +89,11 @@ void REAL_FIELD::Retrieve()
 
 void TEXT_FIELD::Store()
 {
-	if(_value != _defVal)
-	{
-		s.beginGroup(name);
-			s.setValue("kind", "t");
-			s.setValue("value", _value);
-			s.setValue("default:", _defVal);
-		s.endGroup();
-	}
+	s.beginGroup(name);
+		s.setValue("kind", "t");
+		s.setValue("value", _value);
+		s.setValue("default", _defVal);
+	s.endGroup();
 }
 
 void TEXT_FIELD::Retrieve()
@@ -120,16 +108,20 @@ void TEXT_FIELD::Retrieve()
 
 void COMPOUND_FIELD::Store()
 {
-	s.beginGroup(name);
-		s.setValue("kind", "c");
-		s.setValue("value", _value);
-		s.setValue("default:", _defVal);
+	if (!name.isEmpty())
+	{
+		s.beginGroup(name);
+			s.setValue("kind", "c");
+			s.setValue("value", _value);
+			s.setValue("default", _defVal);
+	}
 	for (auto pf : _fields)
 	{
 		if (pf.second->kind != ackNone)
 			pf.second->Store();
 	}
-	s.endGroup();
+	if (!name.isEmpty())
+		s.endGroup();
 }
 
 void COMPOUND_FIELD::Retrieve()
@@ -202,7 +194,7 @@ void COMPOUND_FIELD::AddBoolField(Settings &s, String name, bool _defVal, bool v
 	BOOL_FIELD intf(s, name, _defVal, val, parent);
 	_boolList.push_back(intf);
 	if (_fields.count(name) && _fields[name]->kind != ackBool)
-		throw "expected";
+		throw "bool field expected";
 	_fields[name] = &_boolList.back();
 }
 void COMPOUND_FIELD::AddIntField(Settings &s, String name, int _defVal, int val)
@@ -210,7 +202,7 @@ void COMPOUND_FIELD::AddIntField(Settings &s, String name, int _defVal, int val)
 	INT_FIELD intf(s, name, _defVal, val, parent);
 	_intList.push_back(intf);
 	if (_fields.count(name) && _fields[name]->kind != ackInt)
-		throw "expected";
+		throw "int field expected";
 	_fields[name] = &_intList.back();
 }
 void COMPOUND_FIELD::AddRealField(Settings &s, String name, double _defVal, double val)
@@ -218,7 +210,7 @@ void COMPOUND_FIELD::AddRealField(Settings &s, String name, double _defVal, doub
 	REAL_FIELD intf(s, name, _defVal, val, parent);
 	_realList.push_back(intf);
 	if (_fields.count(name) && _fields[name]->kind != ackReal)
-		throw "expected";
+		throw "real field expected";
 	_fields[name] = &_realList.back();
 }
 void COMPOUND_FIELD::AddTextField(Settings &s, String name, String _defVal, String val)
@@ -227,8 +219,19 @@ void COMPOUND_FIELD::AddTextField(Settings &s, String name, String _defVal, Stri
 	size_t n = _textList.size();
 	_textList.push_back(textf);
 	if (_fields.count(name) && _fields[name]->kind != ackText)
-		throw "expected";
+		throw "text field expected";
 	_fields[name] = &_textList.back();
+}
+
+COMPOUND_FIELD *COMPOUND_FIELD::AddCompField(Settings &s, String name, String _defVal, String val)
+{
+	COMPOUND_FIELD compf(s, name, _defVal, val, parent);
+	size_t n = _textList.size();
+	_compList.push_back(compf);
+	if (_fields.count(name) && _fields[name]->kind != ackComp)
+		throw "compound field expected";
+	_fields[name] = &_compList.back();
+	return &_compList.back();
 }
 
 FIELD_BASE *COMPOUND_FIELD::operator[](String fieldn)
@@ -312,28 +315,36 @@ void ACONFIG::_Store(FIELD_BASE *pf)
 		}
 }
 
-void ACONFIG::_AddFieldFromSettings(Settings & s, String name)
+void ACONFIG::_AddFieldFromSettings(Settings &s, String name)
 {
+	if(!name.isEmpty())
+		s.beginGroup(name); 
+
 	ACONFIG_KIND kind = KindFromString(s.value("kind", "u").toString());
+
+	if (!name.isEmpty())
+		s.endGroup();
 	switch (kind)
 	{
 		case ackBool:	s.beginGroup(name);
-							AddBoolField(name, s.value("defVal", false).toBool(), s.value("value", false).toBool());
+							AddBoolField(name, s.value("default", false).toBool(), s.value("value", false).toBool());
 						s.endGroup();
 			break;
 		case ackInt:	s.beginGroup(name);
-							AddIntField(name, s.value("defVal", 0).toInt(), s.value("value", 0).toInt());
+							AddIntField(name, s.value("default", 0).toInt(), s.value("value", 0).toInt());
 						s.endGroup();
 						break;
 		case ackReal:	s.beginGroup(name);
-							AddRealField(name, s.value("defVal", 0.0).toDouble(), s.value("value", 0.0).toDouble());
+							AddRealField(name, s.value("default", 0.0).toDouble(), s.value("value", 0.0).toDouble());
 						s.endGroup();
 						break;
 		case ackText:	s.beginGroup(name);
-							AddTextField(name, s.value("defVal", "").toString(), s.value("value", "").toString());
+							AddTextField(name, s.value("default", "").toString(), s.value("value", "").toString());
 						s.endGroup();
 						break;
-		case ackComp:
+		case ackComp:	s.beginGroup(name);
+							AddCompField(name, s.value("default", "").toString(), s.value("value", "").toString());
+						s.endGroup();
 						break;
 			default: break;
 	}
@@ -341,11 +352,7 @@ void ACONFIG::_AddFieldFromSettings(Settings & s, String name)
 
 void ACONFIG::Store()		// write to disk after calling this or in ~Settings()
 {
-	for (auto pfs : _fields)
-	{
-		auto pf = pfs.second;
-		_Store(pf);
-	}
+	_pFields->Store();
 	_changed = false;
 }
 
@@ -353,8 +360,39 @@ void ACONFIG::Store()		// write to disk after calling this or in ~Settings()
 //--------------------------------------------------------------
 // writes field into open file in format
 // <name>,<kind (one LC letter)>,<default>,<actual _value>
-
-void ACONFIG::DumpFields(ACONFIG_KIND kind, String file)
+void COMPOUND_FIELD::_DumpFields(std::ostream &ofs, ACONFIG_KIND kind)
+{
+	FIELD_BASE *pf;
+	for (auto a : _fields)
+	{
+		pf = nullptr;
+		switch (kind)
+		{
+			case ackNone: pf = a.second; break;
+			case ackBool: if (a.second->kind == ackBool) pf = a.second; break;
+			case ackInt:  if (a.second->kind == ackInt) pf = a.second; break;
+			case ackReal: if (a.second->kind == ackReal) pf = a.second; break;
+			case ackText: if (a.second->kind == ackText) pf = a.second; break;
+			case ackComp: if (a.second->kind == ackComp) pf = a.second; break;
+		}
+		std::cout << "name: " << pf->name << ", kind: " << AconfigKindToString(pf->kind)
+			<< ", default: ";
+		switch (pf->kind)
+		{
+			case ackBool: std::cout << static_cast<BOOL_FIELD *>(pf)->Default() << ", value: " << static_cast<BOOL_FIELD *>(pf)->Value() << "\n"; break;
+			case ackInt:  std::cout << static_cast<INT_FIELD *> (pf)->Default() << ", value: " << static_cast<INT_FIELD *>(pf)->Value() << "\n"; break;
+			case ackReal: std::cout << static_cast<REAL_FIELD *>(pf)->Default() << ", value: " << static_cast<REAL_FIELD *> (pf)->Value() << "\n"; break;
+			case ackText: std::cout << static_cast<TEXT_FIELD *>(pf)->Default() << ", value: " << static_cast<TEXT_FIELD *>(pf)->Value() << "\n"; break;
+			case ackComp: {
+							std::cout << static_cast<COMPOUND_FIELD *>(pf)->Default() << ", value: " 
+										<< static_cast<COMPOUND_FIELD *>(pf)->Value() << "\n";
+							static_cast<COMPOUND_FIELD *>(pf)->_DumpFields(std::cout, kind);
+						  }
+						  break;
+		}
+	}
+}
+void COMPOUND_FIELD::DumpFields(ACONFIG_KIND kind, String file)
 {
 	std::ofstream ofs;
 	auto coutbuf = std::cout.rdbuf();
@@ -370,28 +408,8 @@ void ACONFIG::DumpFields(ACONFIG_KIND kind, String file)
 		}
 	}
 
-	FIELD_BASE *pf;
-	for (auto a : _fields)
-	{
-		pf = nullptr;
-		switch (kind)
-		{
-			case ackNone: pf = a.second; break;
-			case ackBool:  if (a.second->kind == ackBool) pf = a.second; break;
-			case ackInt:  if(a.second->kind == ackInt) pf = a.second; break;
-			case ackReal:  if (a.second->kind == ackReal) pf = a.second; break;
-			case ackText: if (a.second->kind == ackText) pf = a.second; break;
-		}
-		std::cout << "name: " << pf->name << ", kind: " << AconfigKindToString(pf->kind)
-			<< ", default: ";
-		switch (pf->kind)
-		{
-			case ackBool: std::cout << static_cast<BOOL_FIELD *>(pf)->Default() << ", _value: " << static_cast<BOOL_FIELD *>(pf)->Value() << "\n"; break;
-			case ackInt:  std::cout << static_cast<INT_FIELD *> (pf)->Default() << ", _value: " << static_cast<INT_FIELD *>( pf)->Value() << "\n"; break;
-			case ackReal: std::cout << static_cast<REAL_FIELD *>(pf)->Default() << ", _value: " << static_cast<INT_FIELD *> (pf)->Value() << "\n"; break;
-			case ackText: std::cout << static_cast<TEXT_FIELD *>(pf)->Default() << ", _value: " << static_cast<TEXT_FIELD *>(pf)->Value() << "\n"; break;
-		}
-	}
+	_DumpFields(ofs, kind);
+
 	if (redirected)
 		std::cout.rdbuf(coutbuf);
 }

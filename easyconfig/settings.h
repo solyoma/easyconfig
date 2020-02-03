@@ -87,7 +87,6 @@ protected:
 	std::vector<ValuePair> _values; 
 	bool _notSaved = false;
 	int _nVpIndex;	// in _values;
-	int _nSectNum;	// section index used in GetNextSection
 	String _group;	// actual group
 
 	bool _SetGroupRootFrom(char *buf)
@@ -276,6 +275,13 @@ public:
 		_notSaved = false;	// same as file content
 	}
 
+	void clear() 
+	{ 
+		_values.clear();  
+		_notSaved = false;
+		_group.clear();
+	}
+
 	void setValue(String name, String value)	// name relative to _group
 	{
 		_AddPair(name,value);
@@ -308,6 +314,10 @@ public:
 		if (!_Find(name))
 			return ValueItem(defVal);
 		return ValueItem(operator[](name));
+	}
+	ValueItem value(String name, const char *defVal)
+	{
+		return value(name, String(defVal));
 	}
 	ValueItem value(String name, bool defVal)
 	{
@@ -362,8 +372,8 @@ public:
 	{
 		if (_sIniName.isEmpty() || _sIniName != iniName)
 		{
-			Read(iniName);
-			_notSaved = false;	// same as on disk
+			Read(iniName);		// if Read is successfull
+			_notSaved &= true;	// data is same as on disk
 		}
 		_sIniName = iniName;
 	}
