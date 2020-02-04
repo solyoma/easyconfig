@@ -290,7 +290,7 @@ class ACONFIG
 	bool _changed = false;
 
 	void _Store(FIELD_BASE *pf);
-	void _AddFieldFromSettings(Settings &s, String name);
+	ACONFIG_KIND _AddFieldFromSettings(Settings &s, String name);
 	COMPOUND_FIELD *_pc = nullptr;		// used for embedded compound fields, set when using AddCompField(), reset at EndCompField()
 	std::stack<COMPOUND_FIELD *, std::vector<COMPOUND_FIELD*> > _compStack;
 public:
@@ -334,28 +334,33 @@ public:
 		_pc->AddBoolField(_settings, name, defVal, val); 
 		_changed = true;
 	}
+
 	void AddIntField(String name, int defVal = 0, int val = 0) 
 	{
 		_pc->AddIntField(_settings, name, defVal, val);
 		_changed = true;
 	}
+
 	void AddRealField(String name, double defVal = 0.0, double val = 0.0) 
 	{
 		_pc->AddRealField(_settings, name, defVal, val);
 		_changed = true;
 	}
+
 	void AddTextField(String name, String defVal = String(), String val = String()) 
 	{ 
 		_pc->AddTextField(_settings, name, defVal, val);
 		_changed = true;
 	}
+		   // add sub fields after this and finish with 'EndCompField()'
 	COMPOUND_FIELD* AddCompField(String name, String defVal = String(), String val = String()) 
 	{ 
 		_changed = true;
 		COMPOUND_FIELD *pc = _pc->AddCompField(_settings, name, defVal, val);
 		_compStack.push(pc);
-		_pc = pc;
+		return _pc = pc;
 	}
+
 	void EndCompField()			// call after AddCompField
 	{ 
 		if (!_compStack.empty()) 

@@ -64,6 +64,12 @@ int main()
 							std::string("default_") + std::to_string(i), 
 							std::string("tfield")+ std::to_string(i)		);
 	}
+	// Add compound field:
+
+	config.AddCompField("color with opacity", "#FFFFFF", "#bcdea2");
+	config.AddRealField("opacity", 0.0, 0.5);
+	config.EndCompField();
+
 	cout << "Storing INI into 'aconfig.ini', then saving it";
 	config.Store(); 
 	config.Save();

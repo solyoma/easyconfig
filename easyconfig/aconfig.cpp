@@ -279,18 +279,26 @@ void ACONFIG::Load(String fname)	// from ini file
 	_settings.Load(fname);	   // reads into 's'
 
 	StringList sl = _settings.allKeys();	// create config. variables
-	size_t pos;
-	String name;
+	String	name,		// name of actual group inside 'group'
+			group;		// name of last compound group
+				// example: for 'group/for/this/value=val'
+				//		name = "value", group = "group/for/this/"	
+	size_t	pos,		// index of SECTION_DELIMITER after the last one in 'group' (example: index of 'v' in 'value')
+			posG;		// index of last delimiter of 'group (example: index of 
 	
+	ACONFIG_KIND kind;
 	for (auto key : sl)
 	{
 		pos = key.indexOf(SETTINGS_DELIMITER);
 		if (pos != NPOS)
 		{
-			if (key.left(pos) == name)
-				continue;
+			if (key.left(pos) == name)	// skip 'defailt=.." and "value=" lines which are dealt with
+				continue;				// in _AddFieldFromSettings
 			name = key.left(pos);
-			_AddFieldFromSettings(_settings, name);
+			kind = _AddFieldFromSettings(_settings, name);
+			if (kind == ackComp)
+				group += name + SETTINGS_DELIMITER;
+
 		}
 	}
 
@@ -315,7 +323,7 @@ void ACONFIG::_Store(FIELD_BASE *pf)
 		}
 }
 
-void ACONFIG::_AddFieldFromSettings(Settings &s, String name)
+ACONFIG_KIND ACONFIG::_AddFieldFromSettings(Settings &s, String name)
 {
 	if(!name.isEmpty())
 		s.beginGroup(name); 
@@ -329,7 +337,7 @@ void ACONFIG::_AddFieldFromSettings(Settings &s, String name)
 		case ackBool:	s.beginGroup(name);
 							AddBoolField(name, s.value("default", false).toBool(), s.value("value", false).toBool());
 						s.endGroup();
-			break;
+						break;
 		case ackInt:	s.beginGroup(name);
 							AddIntField(name, s.value("default", 0).toInt(), s.value("value", 0).toInt());
 						s.endGroup();
@@ -348,6 +356,8 @@ void ACONFIG::_AddFieldFromSettings(Settings &s, String name)
 						break;
 			default: break;
 	}
+
+	return kind;
 }
 
 void ACONFIG::Store()		// write to disk after calling this or in ~Settings()
