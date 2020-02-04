@@ -228,10 +228,14 @@ public:
 		{
 			_values.clear();
 
-			while (!ifs.eof() && ifs.getline(buf, 1024, '\n'))
+			while (!ifs.eof() && ifs.getline(buf, 1024, '\n') )
 			{
-				if (!_SetGroupRootFrom(buf))		// if [group name] => set _groups
-					_AddPair(buf);				// else add lines to actual group
+				Trim(buf);
+				if(*buf)		// line is not empty
+				{
+					if (!_SetGroupRootFrom(buf))	// if [group name] => set _groups
+						_AddPair(buf);				// else add lines to actual group
+				}
 			}
 			_notSaved = false;					// same as on disk
 			_group.clear();						// not inside any group
@@ -254,6 +258,8 @@ public:
 		String s;
 		size_t len = 0;
 
+		bool first = true;
+
 		for (auto v : _values)
 		{
 			auto n = v.first.indexOf(SETTINGS_DELIMITER);
@@ -263,6 +269,10 @@ public:
 				if (_group != s)
 				{
 					_group = s;
+					if (!first)
+						ofs << "\n";
+					else
+						first = false;
 					ofs << "[" << s << "]\n";
 					len = s.length()+1;		// skip SETTINGS_DELIMITER
 				}

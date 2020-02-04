@@ -374,7 +374,7 @@ public:
 
 	void Store();				// in _settings
 	void Load(String iniName);	// from ini file
-	void Save() {	_settings.Save();	}				// into ini file it was Load()-ed from
+	void Save() { _settings.Save();	}				// into ini file it was Load()-ed from
 	void Save(String iniName) { _settings.Save(iniName); }	// to ini file 
 	void SetChanged(bool set) { _changed = set; }
 	// DEBUG

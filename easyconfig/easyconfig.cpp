@@ -66,7 +66,7 @@ int main()
 	}
 	// Add compound field:
 
-	config.AddCompField("color with opacity", "#FFFFFF", "#bcdea2");
+	config.AddCompField("color", "#FFFFFF", "#bcdea2");
 	config.AddRealField("opacity", 0.0, 0.5);
 	config.EndCompField();
 

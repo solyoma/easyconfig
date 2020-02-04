@@ -216,7 +216,6 @@ void COMPOUND_FIELD::AddRealField(Settings &s, String name, double _defVal, doub
 void COMPOUND_FIELD::AddTextField(Settings &s, String name, String _defVal, String val)
 {
 	TEXT_FIELD textf(s, name, _defVal, val, parent);
-	size_t n = _textList.size();
 	_textList.push_back(textf);
 	if (_fields.count(name) && _fields[name]->kind != ackText)
 		throw "text field expected";
@@ -226,7 +225,6 @@ void COMPOUND_FIELD::AddTextField(Settings &s, String name, String _defVal, Stri
 COMPOUND_FIELD *COMPOUND_FIELD::AddCompField(Settings &s, String name, String _defVal, String val)
 {
 	COMPOUND_FIELD compf(s, name, _defVal, val, parent);
-	size_t n = _textList.size();
 	_compList.push_back(compf);
 	if (_fields.count(name) && _fields[name]->kind != ackComp)
 		throw "compound field expected";
@@ -278,26 +276,31 @@ void ACONFIG::Load(String fname)	// from ini file
 
 	_settings.Load(fname);	   // reads into 's'
 
-	StringList sl = _settings.allKeys();	// create config. variables
-	String	name,		// name of actual group inside 'group'
-			group;		// name of last compound group
-				// example: for 'group/for/this/value=val'
-				//		name = "value", group = "group/for/this/"	
+	StringList sl = _settings.allKeys();	// create config. variables	for each line
+	String	name;		// name of field w. the group. E.g. "color" or "color/opacity"
+				
 	size_t	pos,		// index of SECTION_DELIMITER after the last one in 'group' (example: index of 'v' in 'value')
-			posG;		// index of last delimiter of 'group (example: index of 
+			posG = 0;	// index of last delimiter of a compound field
 	
-	ACONFIG_KIND kind;
-	for (auto key : sl)
-	{
-		pos = key.indexOf(SETTINGS_DELIMITER);
+	ACONFIG_KIND kind = ackNone;
+	for (auto key : sl)		// key: full path name, e.g. "color/value"	for field named "color"
+	{						//						or	 "color/opacity/value"  for field of 'color' named "opacity"
+		pos = key.lastIndexOf(SETTINGS_DELIMITER, key.length() - name.length() );		// after the path and before the "kind","value" and "default
 		if (pos != NPOS)
 		{
-			if (key.left(pos) == name)	// skip 'defailt=.." and "value=" lines which are dealt with
+			if (pos <= posG)		// end of compound field found
+			{
+				if(posG)			// then it was a compound field
+					EndCompField();	
+
+				posG = 0;
+			}
+			if(name == key.left(pos))	// skip 'default=.." and "value=" lines for the same group, which are dealt with
 				continue;				// in _AddFieldFromSettings
 			name = key.left(pos);
 			kind = _AddFieldFromSettings(_settings, name);
-			if (kind == ackComp)
-				group += name + SETTINGS_DELIMITER;
+			if (kind == ackComp)		// then field pointer is on top of stack
+				posG = pos;
 
 		}
 	}
@@ -323,34 +326,41 @@ void ACONFIG::_Store(FIELD_BASE *pf)
 		}
 }
 
-ACONFIG_KIND ACONFIG::_AddFieldFromSettings(Settings &s, String name)
+ACONFIG_KIND ACONFIG::_AddFieldFromSettings(Settings &s, String path)
 {
-	if(!name.isEmpty())
-		s.beginGroup(name); 
+	if (path.isEmpty())		// no top level key value pair can be a field
+		return ackNone;
+
+	s.beginGroup(path); 
 
 	ACONFIG_KIND kind = KindFromString(s.value("kind", "u").toString());
+	s.endGroup();
 
-	if (!name.isEmpty())
-		s.endGroup();
+	int pos = (int)path.lastIndexOf(SETTINGS_DELIMITER);
+	if (pos == (int)NPOS)
+		pos = -1;
+
+	String name = path.mid(pos + 1);	// name of field
+
 	switch (kind)
 	{
-		case ackBool:	s.beginGroup(name);
+		case ackBool:	s.beginGroup(path);
 							AddBoolField(name, s.value("default", false).toBool(), s.value("value", false).toBool());
 						s.endGroup();
 						break;
-		case ackInt:	s.beginGroup(name);
+		case ackInt:	s.beginGroup(path);
 							AddIntField(name, s.value("default", 0).toInt(), s.value("value", 0).toInt());
 						s.endGroup();
 						break;
-		case ackReal:	s.beginGroup(name);
+		case ackReal:	s.beginGroup(path);
 							AddRealField(name, s.value("default", 0.0).toDouble(), s.value("value", 0.0).toDouble());
 						s.endGroup();
 						break;
-		case ackText:	s.beginGroup(name);
+		case ackText:	s.beginGroup(path);
 							AddTextField(name, s.value("default", "").toString(), s.value("value", "").toString());
 						s.endGroup();
 						break;
-		case ackComp:	s.beginGroup(name);
+		case ackComp:	s.beginGroup(path);
 							AddCompField(name, s.value("default", "").toString(), s.value("value", "").toString());
 						s.endGroup();
 						break;
