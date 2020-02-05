@@ -48,7 +48,11 @@ public:
 using StringList = std::list<String>;
 using StringMap = std::map<String, String>;
 
-const char SETTINGS_DELIMITER = '/';	
+#ifdef _MSC_VER
+	const char SETTINGS_DELIMITER = '\\';
+#else
+	const char SETTINGS_DELIMITER = '/';	
+#endif
 
 // pairs: ( <full name>, <value> )	<= <full name> = <value>
 // Example 
@@ -218,6 +222,8 @@ public:
 		else
 			_group.clear();							// no more '\' at end: last group
 	}
+
+	String group() const { return _group; }
 
 	int Read(String name)
 	{

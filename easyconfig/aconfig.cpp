@@ -277,30 +277,34 @@ void ACONFIG::Load(String fname)	// from ini file
 	_settings.Load(fname);	   // reads into 's'
 
 	StringList sl = _settings.allKeys();	// create config. variables	for each line
-	String	name;		// name of field w. the group. E.g. "color" or "color/opacity"
-				
-	size_t	pos,		// index of SECTION_DELIMITER after the last one in 'group' (example: index of 'v' in 'value')
-			posG = 0;	// index of last delimiter of a compound field
+	String	name,		// name of field w. the group. E.g. "color" or "color/opacity"
+			actGrp;		// active compound group
+
+	size_t	pos;		// index of SECTION_DELIMITER after the last one in 'group' (example: index of 'v' in 'value')
+	int compLevel = 0;
 	
 	ACONFIG_KIND kind = ackNone;
 	for (auto key : sl)		// key: full path name, e.g. "color/value"	for field named "color"
 	{						//						or	 "color/opacity/value"  for field of 'color' named "opacity"
-		pos = key.lastIndexOf(SETTINGS_DELIMITER, key.length() - name.length() );		// after the path and before the "kind","value" and "default
+		pos = key.lastIndexOf(SETTINGS_DELIMITER );		// after the path and before the "kind","value" and "default
 		if (pos != NPOS)
 		{
-			if (pos <= posG)		// end of compound field found
+			if (inCompField)		// end of compound field found
 			{
-				if(posG)			// then it was a compound field
-					EndCompField();	
-
-				posG = 0;
+				EndCompField();	
+				inCompField = false;
 			}
 			if(name == key.left(pos))	// skip 'default=.." and "value=" lines for the same group, which are dealt with
 				continue;				// in _AddFieldFromSettings
+			if(!actGrp.isEmpty() && ???)
+
 			name = key.left(pos);
 			kind = _AddFieldFromSettings(_settings, name);
 			if (kind == ackComp)		// then field pointer is on top of stack
-				posG = pos;
+			{
+				actGrp += name;
+				++compLevel;
+			}
 
 		}
 	}
@@ -332,7 +336,6 @@ ACONFIG_KIND ACONFIG::_AddFieldFromSettings(Settings &s, String path)
 		return ackNone;
 
 	s.beginGroup(path); 
-
 	ACONFIG_KIND kind = KindFromString(s.value("kind", "u").toString());
 	s.endGroup();
 
