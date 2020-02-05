@@ -1,4 +1,12 @@
 #pragma once
+
+#ifdef _USE_QT
+
+#include <QSettings>
+
+using Settings = QSettings;
+#else
+
 #include <sys/stat.h>
 #include <string>
 #include <vector>
@@ -382,23 +390,16 @@ class Settings	: public ValueVector
 	}
 public:
 	Settings() {};
-	Settings(String iniName) { SetName(iniName); }
-	Settings(String oName, String iniName) : _sOName(oName) { SetName(iniName);	}
-	void SetName(String iniName)
-	{
-		if (_sIniName.isEmpty() || _sIniName != iniName)
-		{
-			Read(iniName);		// if Read is successfull
-			_notSaved &= true;	// data is same as on disk
-		}
-		_sIniName = iniName;
-	}
-	void SetNames(String oName, String iniName) { _sOName = oName; SetName(iniName); }
+	Settings(String iniName) { Load(iniName); }
+	Settings(String oName, String iniName) : _sOName(oName) { Load(iniName);	}
+ 
+	void SetNames(String oName, String iniName) { _sOName = oName; Load(iniName); }
 
 	void Load(String iniName) 
 	{
+		Read(iniName);		// if Read is successfull
+		_notSaved &= true;	// data is same as on disk
 		_sIniName = iniName;
-		Read(iniName);
 	}
 	void Save() 
 	{ 
@@ -417,3 +418,4 @@ public:
 
 };
 
+#endif		// _USE_QT

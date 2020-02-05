@@ -302,11 +302,9 @@ public:
 	}
 	ACONFIG(String iniName) :ACONFIG()
 	{ 
-		_settings.SetName(iniName); 
+		Load(iniName); 
 	}
 	~ACONFIG() {}
-
-	void SetName(String iniName) { _settings.SetName(iniName); }
 
 	ACONFIG &operator=(const ACONFIG &other) 
 	{ 

@@ -281,7 +281,6 @@ void ACONFIG::Load(String fname)	// from ini file
 			actGrp;		// active compound group
 
 	size_t	pos;		// index of SECTION_DELIMITER after the last one in 'group' (example: index of 'v' in 'value')
-	int compLevel = 0;
 	
 	ACONFIG_KIND kind = ackNone;
 	for (auto key : sl)		// key: full path name, e.g. "color/value"	for field named "color"
@@ -289,23 +288,27 @@ void ACONFIG::Load(String fname)	// from ini file
 		pos = key.lastIndexOf(SETTINGS_DELIMITER );		// after the path and before the "kind","value" and "default
 		if (pos != NPOS)
 		{
-			if (inCompField)		// end of compound field found
-			{
-				EndCompField();	
-				inCompField = false;
-			}
 			if(name == key.left(pos))	// skip 'default=.." and "value=" lines for the same group, which are dealt with
 				continue;				// in _AddFieldFromSettings
-			if(!actGrp.isEmpty() && ???)
+			if(!actGrp.isEmpty() && key.left(actGrp.length())!= actGrp)
+			{
+				EndCompField();	
+				size_t posl = actGrp.lastIndexOf(SETTINGS_DELIMITER);
+				if (posl != NPOS)
+					actGrp = actGrp.left(posl);
+				else
+					actGrp.clear();
+			}
 
 			name = key.left(pos);
 			kind = _AddFieldFromSettings(_settings, name);
 			if (kind == ackComp)		// then field pointer is on top of stack
 			{
-				actGrp += name;
-				++compLevel;
-			}
+				if (!actGrp.isEmpty())
+					actGrp += SETTINGS_DELIMITER;
 
+				actGrp += name;
+			}
 		}
 	}
 
